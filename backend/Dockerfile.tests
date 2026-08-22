@@ -1,0 +1,5 @@
+FROM mcr.microsoft.com/dotnet/sdk:8.0
+WORKDIR /src
+COPY . .
+RUN dotnet restore ProbMind.sln
+CMD ["dotnet", "test", "ProbMind.sln", "-c", "Release", "--no-restore", "--logger", "console;verbosity=normal"]

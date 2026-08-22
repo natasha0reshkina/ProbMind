@@ -1,0 +1,65 @@
+name: ProbMind CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: probmind
+          POSTGRES_USER: probmind
+          POSTGRES_PASSWORD: probmind
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U probmind -d probmind"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ConnectionStrings__Postgres: Host=localhost;Port=5432;Database=probmind;Username=probmind;Password=probmind
+      ConnectionStrings__Redis: localhost:6379
+      Jwt__Issuer: ProbMind
+      Jwt__Audience: ProbMind.Web
+      Jwt__SigningKey: ci-signing-key-for-probmind-at-least-32-characters-long
+      Jwt__AccessTokenMinutes: 20
+      Jwt__RefreshTokenDays: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Restore
+        run: dotnet restore backend/ProbMind.sln
+      - name: Build
+        run: dotnet build backend/ProbMind.sln -c Release --no-restore
+      - name: Tests
+        run: dotnet test backend/ProbMind.sln -c Release --no-build
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        working-directory: frontend
+        run: npm install
+      - name: Type-check and build
+        working-directory: frontend
+        run: npm run check

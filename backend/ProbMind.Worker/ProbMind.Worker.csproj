@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>ProbMind.Worker</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ProbMind.Application\ProbMind.Application.csproj" />
+    <ProjectReference Include="..\ProbMind.Infrastructure\ProbMind.Infrastructure.csproj" />
+  </ItemGroup>
+</Project>

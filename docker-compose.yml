@@ -1,0 +1,94 @@
+name: probmind
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: probmind
+      POSTGRES_USER: probmind
+      POSTGRES_PASSWORD: probmind
+    volumes:
+      - probmind_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U probmind -d probmind"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.api
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=probmind;Username=probmind;Password=probmind
+      ConnectionStrings__Redis: redis:6379
+      Jwt__Issuer: ProbMind
+      Jwt__Audience: ProbMind.Web
+      Jwt__SigningKey: local-docker-signing-key-for-probmind-at-least-32-characters-long
+      Jwt__AccessTokenMinutes: 20
+      Jwt__RefreshTokenDays: 30
+    ports:
+      - "8000:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      interval: 5s
+      timeout: 4s
+      retries: 30
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    environment:
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=probmind;Username=probmind;Password=probmind
+      ConnectionStrings__Redis: redis:6379
+      Jwt__Issuer: ProbMind
+      Jwt__Audience: ProbMind.Web
+      Jwt__SigningKey: local-docker-signing-key-for-probmind-at-least-32-characters-long
+    depends_on:
+      api:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  tests:
+    profiles: ["check"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.tests
+    environment:
+      ConnectionStrings__Postgres: Host=postgres;Port=5432;Database=probmind;Username=probmind;Password=probmind
+      ConnectionStrings__Redis: redis:6379
+      Jwt__Issuer: ProbMind
+      Jwt__Audience: ProbMind.Web
+      Jwt__SigningKey: local-docker-signing-key-for-probmind-at-least-32-characters-long
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  probmind_postgres:

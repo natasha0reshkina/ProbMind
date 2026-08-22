@@ -1,0 +1,54 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProbMind.Domain", "ProbMind.Domain\ProbMind.Domain.csproj", "{46e16ed7-6fe0-b21d-3cac-c4560da8fc66}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProbMind.Application", "ProbMind.Application\ProbMind.Application.csproj", "{d37c07fb-2421-dbbf-1f71-450fd2396e47}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProbMind.Infrastructure", "ProbMind.Infrastructure\ProbMind.Infrastructure.csproj", "{d5601ea0-f45f-8fe6-fc50-034512c14bd2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProbMind.Api", "ProbMind.Api\ProbMind.Api.csproj", "{fd44b963-2bbe-28de-8633-0174c2aa5c33}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProbMind.Worker", "ProbMind.Worker\ProbMind.Worker.csproj", "{274ccb2f-f77d-18b0-3e39-9fe3be7e5efa}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProbMind.UnitTests", "ProbMind.UnitTests\ProbMind.UnitTests.csproj", "{9360a618-2a0c-ad71-3538-d75537984512}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ProbMind.IntegrationTests", "ProbMind.IntegrationTests\ProbMind.IntegrationTests.csproj", "{823da768-bbe8-66f2-d751-939205349a9f}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{46e16ed7-6fe0-b21d-3cac-c4560da8fc66}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{46e16ed7-6fe0-b21d-3cac-c4560da8fc66}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{46e16ed7-6fe0-b21d-3cac-c4560da8fc66}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{46e16ed7-6fe0-b21d-3cac-c4560da8fc66}.Release|Any CPU.Build.0 = Release|Any CPU
+		{d37c07fb-2421-dbbf-1f71-450fd2396e47}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{d37c07fb-2421-dbbf-1f71-450fd2396e47}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{d37c07fb-2421-dbbf-1f71-450fd2396e47}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{d37c07fb-2421-dbbf-1f71-450fd2396e47}.Release|Any CPU.Build.0 = Release|Any CPU
+		{d5601ea0-f45f-8fe6-fc50-034512c14bd2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{d5601ea0-f45f-8fe6-fc50-034512c14bd2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{d5601ea0-f45f-8fe6-fc50-034512c14bd2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{d5601ea0-f45f-8fe6-fc50-034512c14bd2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{fd44b963-2bbe-28de-8633-0174c2aa5c33}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{fd44b963-2bbe-28de-8633-0174c2aa5c33}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{fd44b963-2bbe-28de-8633-0174c2aa5c33}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{fd44b963-2bbe-28de-8633-0174c2aa5c33}.Release|Any CPU.Build.0 = Release|Any CPU
+		{274ccb2f-f77d-18b0-3e39-9fe3be7e5efa}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{274ccb2f-f77d-18b0-3e39-9fe3be7e5efa}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{274ccb2f-f77d-18b0-3e39-9fe3be7e5efa}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{274ccb2f-f77d-18b0-3e39-9fe3be7e5efa}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9360a618-2a0c-ad71-3538-d75537984512}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9360a618-2a0c-ad71-3538-d75537984512}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9360a618-2a0c-ad71-3538-d75537984512}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9360a618-2a0c-ad71-3538-d75537984512}.Release|Any CPU.Build.0 = Release|Any CPU
+		{823da768-bbe8-66f2-d751-939205349a9f}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{823da768-bbe8-66f2-d751-939205349a9f}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{823da768-bbe8-66f2-d751-939205349a9f}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{823da768-bbe8-66f2-d751-939205349a9f}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal

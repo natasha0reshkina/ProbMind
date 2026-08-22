@@ -1,0 +1,92 @@
+using System.Text.Json;
+using ProbMind.Application.Abstractions.Persistence;
+using ProbMind.Application.Contracts;
+using ProbMind.Domain.Entities;
+using ProbMind.Domain.Enums;
+
+namespace ProbMind.Application.Services;
+
+public sealed class AdminService : IAdminService
+{
+    private readonly IUnitOfWork _uow;
+
+    public AdminService(IUnitOfWork uow) => _uow = uow;
+
+    public async Task<IReadOnlyList<AdminUserDto>> ListUsersAsync(CancellationToken ct = default) =>
+        (await _uow.Users.ListAsync(ct))
+            .OrderByDescending(x => x.CreatedAt)
+            .Select(Map)
+            .ToArray();
+
+    public async Task<AdminUserDto> SetRoleAsync(
+        Guid actorId,
+        SetUserRoleRequest request,
+        CancellationToken ct = default)
+    {
+        var user = await _uow.Users.GetByIdAsync(request.UserId, ct)
+            ?? throw new KeyNotFoundException("User not found.");
+        var old = user.Role;
+        user.Role = request.Role;
+        user.Touch();
+        _uow.Users.Update(user);
+
+        await _uow.AuditLogs.AddAsync(new AuditLog
+        {
+            ActorUserId = actorId,
+            Action = AuditAction.RoleChanged,
+            EntityType = nameof(User),
+            EntityId = user.Id,
+            OldValueJson = JsonSerializer.Serialize(new { role = old }),
+            NewValueJson = JsonSerializer.Serialize(new { role = user.Role }),
+            RequestId = Guid.NewGuid().ToString("N")
+        }, ct);
+
+        await _uow.SaveChangesAsync(ct);
+        return Map(user);
+    }
+
+    public async Task<AdminUserDto> SetActiveAsync(
+        Guid actorId,
+        SetUserActiveRequest request,
+        CancellationToken ct = default)
+    {
+        if (actorId == request.UserId && !request.IsActive)
+            throw new InvalidOperationException("Administrator cannot deactivate the current account.");
+
+        var user = await _uow.Users.GetByIdAsync(request.UserId, ct)
+            ?? throw new KeyNotFoundException("User not found.");
+        var old = user.IsActive;
+        user.IsActive = request.IsActive;
+        user.Touch();
+        _uow.Users.Update(user);
+
+        await _uow.AuditLogs.AddAsync(new AuditLog
+        {
+            ActorUserId = actorId,
+            Action = AuditAction.Updated,
+            EntityType = nameof(User),
+            EntityId = user.Id,
+            OldValueJson = JsonSerializer.Serialize(new { isActive = old }),
+            NewValueJson = JsonSerializer.Serialize(new { isActive = user.IsActive }),
+            RequestId = Guid.NewGuid().ToString("N")
+        }, ct);
+
+        await _uow.SaveChangesAsync(ct);
+        return Map(user);
+    }
+
+    public async Task<IReadOnlyList<AuditLogDto>> AuditAsync(int take, CancellationToken ct = default)
+    {
+        take = Math.Clamp(take, 1, 500);
+        return (await _uow.AuditLogs.ListAsync(ct))
+            .OrderByDescending(x => x.CreatedAt)
+            .Take(take)
+            .Select(x => new AuditLogDto(
+                x.Id, x.ActorUserId, x.Action, x.EntityType, x.EntityId,
+                x.OldValueJson, x.NewValueJson, x.RequestId, x.CreatedAt))
+            .ToArray();
+    }
+
+    private static AdminUserDto Map(User x) =>
+        new(x.Id, x.Email, x.DisplayName, x.Role, x.IsActive, x.LastLoginAt, x.CreatedAt);
+}
