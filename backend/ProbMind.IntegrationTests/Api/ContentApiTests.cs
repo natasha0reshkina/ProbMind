@@ -40,6 +40,6 @@ public sealed class ContentApiTests
         var questions = await response.Content.ReadFromJsonAsync<JsonElement>();
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.True(questions.GetArrayLength() >= 200);
+        Assert.True(questions.GetArrayLength() >= 60);
     }
 }

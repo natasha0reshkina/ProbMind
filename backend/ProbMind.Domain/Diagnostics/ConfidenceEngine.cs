@@ -10,9 +10,9 @@ public sealed class ConfidenceEngine
         new Dictionary<EvidenceKind, double>
         {
             [EvidenceKind.Distractor] = 1.00,
-            [EvidenceKind.CorrectAnswer] = -0.55,
-            [EvidenceKind.CorrectionSuccess] = -0.85,
-            [EvidenceKind.TransferSuccess] = -1.15,
+            [EvidenceKind.CorrectAnswer] = 0.55,
+            [EvidenceKind.CorrectionSuccess] = 0.85,
+            [EvidenceKind.TransferSuccess] = 1.15,
             [EvidenceKind.TransferFailure] = 1.20,
             [EvidenceKind.ManualTeacherEvidence] = 1.30
         };
