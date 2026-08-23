@@ -24,6 +24,17 @@ if ! docker info >/dev/null 2>&1; then
   exit 1
 fi
 
+if [[ ! -f .env ]]; then
+  cp .env.example .env
+fi
+
+set -a
+source .env
+set +a
+
+API_PORT=${API_PORT:-8010}
+WEB_PORT=${WEB_PORT:-8080}
+
 echo "Останавливаю предыдущий запуск проекта..."
 docker compose down --remove-orphans >/dev/null 2>&1 || true
 
@@ -45,7 +56,7 @@ docker compose up -d postgres redis api worker frontend || fail "не удало
 printf "Ожидаю готовность API"
 api_ready=0
 for i in {1..120}; do
-  if curl -fsS http://127.0.0.1:8000/api/ready >/dev/null 2>&1; then
+  if curl -fsS "http://127.0.0.1:${API_PORT}/api/ready" >/dev/null 2>&1; then
     api_ready=1
     break
   fi
@@ -61,7 +72,7 @@ fi
 printf "Ожидаю frontend"
 frontend_ready=0
 for i in {1..60}; do
-  if curl -fsS http://127.0.0.1:8080/ >/dev/null 2>&1; then
+  if curl -fsS "http://127.0.0.1:${WEB_PORT}/" >/dev/null 2>&1; then
     frontend_ready=1
     break
   fi
@@ -82,7 +93,7 @@ fi
 
 echo ""
 echo "ProbMind запущен."
-echo "Приложение: http://127.0.0.1:8080"
-echo "Swagger:     http://127.0.0.1:8000/api/swagger"
+echo "Приложение: http://127.0.0.1:${WEB_PORT}"
+echo "Swagger:     http://127.0.0.1:${API_PORT}/api/swagger"
 echo ""
-open "http://127.0.0.1:8080/"
+open "http://127.0.0.1:${WEB_PORT}/"

@@ -173,6 +173,7 @@ public sealed class LearnerModelService : ILearnerModelService
             ct);
 
         var state = states.SingleOrDefault();
+        var isNewState = state is null;
         if (state is null)
         {
             state = new UserMisconception
@@ -204,7 +205,8 @@ public sealed class LearnerModelService : ILearnerModelService
             state.CorrectedAt = _clock.UtcNow;
 
         state.Touch();
-        _uow.UserMisconceptions.Update(state);
+        if (!isNewState)
+            _uow.UserMisconceptions.Update(state);
 
         if (oldStatus != state.Status)
         {
@@ -295,6 +297,7 @@ public sealed class LearnerModelService : ILearnerModelService
             ct);
 
         var state = states.SingleOrDefault();
+        var isNewState = state is null;
         if (state is null)
         {
             state = new TopicMastery
@@ -313,7 +316,8 @@ public sealed class LearnerModelService : ILearnerModelService
             ? null
             : observations.Max(x => x.ObservedAt);
         state.Touch();
-        _uow.TopicMasteries.Update(state);
+        if (!isNewState)
+            _uow.TopicMasteries.Update(state);
 
         if (Math.Abs(before - state.Mastery) >= 0.015d || state.ObservationCount == observations.Count)
         {

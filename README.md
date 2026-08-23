@@ -12,7 +12,7 @@
 
 Приложение: `http://127.0.0.1:8080`
 
-Swagger: `http://127.0.0.1:8000/api/swagger`
+Swagger: `http://127.0.0.1:8010/api/swagger`
 
 Остановка:
 
@@ -20,7 +20,7 @@ Swagger: `http://127.0.0.1:8000/api/swagger`
 ./Stop_ProbMind.command
 ```
 
-Проверка сборки и тестов:
+Сборка и тесты:
 
 ```bash
 ./Check_ProbMind.command
@@ -32,6 +32,8 @@ Swagger: `http://127.0.0.1:8000/api/swagger`
 xattr -dr com.apple.quarantine .
 chmod +x *.command
 ```
+
+Параметры локального окружения находятся в `.env.example`. При первом запуске создаётся `.env`, который не добавляется в Git.
 
 ## Стек
 

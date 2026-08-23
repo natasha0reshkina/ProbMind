@@ -141,9 +141,9 @@ export function PracticePage() {
           <span className="eyebrow">{question.isTransfer ? 'Задание на перенос' : statusLabel(question.difficulty)}</span>
           <h2>{question.prompt}</h2>
           <div className="answer-grid">
-            {question.options.map((option) => (
+            {question.options.map((option, index) => (
               <button className="answer-option" key={option.id} disabled={Boolean(feedback)} onClick={() => submit.mutate(option.id)}>
-                <span>{String.fromCharCode(64 + option.sortOrder)}</span>{option.text}
+                <span>{String.fromCharCode(65 + index)}</span>{option.text}
               </button>
             ))}
           </div>

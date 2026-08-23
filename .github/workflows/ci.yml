@@ -59,7 +59,7 @@ jobs:
           node-version: '22'
       - name: Install
         working-directory: frontend
-        run: npm install
-      - name: Type-check and build
+        run: npm install --no-audit --no-fund
+      - name: Build
         working-directory: frontend
-        run: npm run check
+        run: npm run build

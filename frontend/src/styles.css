@@ -380,23 +380,27 @@ button:disabled { cursor: default; opacity: .55; }
 
 .cards-grid { display: grid; gap: 16px; }
 .topic-list { display: grid; }
+.report-topic-list { border-top: 1px solid var(--line); }
 .topic-row {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(190px, 1.1fr) minmax(160px, .9fr) 42px;
+  gap: 14px;
   align-items: center;
+  min-height: 64px;
   padding: 10px 0;
   border-bottom: 1px solid var(--line-soft);
 }
 .topic-row:last-child { border-bottom: 0; }
+.topic-row__meta { min-width: 0; }
 .topic-row__meta strong,
 .topic-row__meta span { display: block; }
-.topic-row__meta strong { font-size: .8rem; }
-.topic-row__meta span { margin-top: 2px; color: var(--muted); font-size: .69rem; }
+.topic-row__meta strong { font-size: .8rem; line-height: 1.35; }
+.topic-row__meta span { margin-top: 3px; color: var(--muted); font-size: .69rem; }
+.topic-row__score { color: #4f5b65; font-size: .74rem; font-weight: 650; text-align: right; font-variant-numeric: tabular-nums; }
 .progress-wrap { display: flex; align-items: center; gap: 8px; }
 .progress-track { height: 5px; flex: 1; overflow: hidden; background: #e5e8eb; }
 .progress-value { height: 100%; background: #5c7485; }
-.progress-label { color: #59646e; font-size: .72rem; min-width: 38px; text-align: right; }
+.progress-label { display: flex; align-items: center; gap: 10px; color: #59646e; font-size: .72rem; white-space: nowrap; }
 .compact-progress { display: grid; grid-template-columns: 45px minmax(70px, 1fr); gap: 8px; align-items: center; }
 
 .chart-panel {
@@ -475,7 +479,10 @@ label { display: grid; gap: 5px; color: #4c5660; font-size: .74rem; font-weight:
 
 .answer-grid { display: grid; gap: 8px; margin: 16px 0; }
 .answer-option {
-  display: block;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
   width: 100%;
   border: 1px solid #cdd3d8;
   border-radius: 3px;
@@ -485,6 +492,10 @@ label { display: grid; gap: 5px; color: #4c5660; font-size: .74rem; font-weight:
   text-align: left;
 }
 .answer-option:hover { border-color: #8095a4; background: #fafbfc; }
+.answer-letter { color: #5f6972; font-weight: 650; }
+.answer-text { min-width: 0; line-height: 1.45; }
+.answer-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.answer-hint { color: var(--muted); font-size: .72rem; }
 .question-card { border: 1px solid var(--line); background: #fff; padding: 18px; }
 .feedback { margin-top: 14px; padding: 11px 12px; border-left: 3px solid #8095a4; background: #f6f8f9; font-size: .8rem; }
 .feedback-meta { margin-top: 7px; color: var(--muted); font-size: .7rem; }
@@ -496,13 +507,19 @@ label { display: grid; gap: 5px; color: #4c5660; font-size: .74rem; font-weight:
 
 .misconception-list { display: grid; border-top: 1px solid var(--line); }
 .misconception-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 20px;
+  align-items: center;
   padding: 12px 0;
   border-bottom: 1px solid var(--line-soft);
 }
-.misconception-row__right { text-align: right; }
+.misconception-row__main { min-width: 0; }
+.misconception-row__main strong,
+.misconception-row__main span { display: block; }
+.misconception-row__main strong { line-height: 1.32; }
+.misconception-row__main span { margin-top: 3px; color: var(--muted); font-size: .72rem; }
+.misconception-row__right { display: grid; gap: 4px; justify-items: end; min-width: 92px; text-align: right; }
 .confidence-row { display: flex; gap: 12px; align-items: center; }
 .big-score,
 .compact-score { font-variant-numeric: tabular-nums; font-weight: 650; }
@@ -648,6 +665,7 @@ label { display: grid; gap: 5px; color: #4c5660; font-size: .74rem; font-weight:
   .kpi-strip__item:nth-child(-n+2),
   .system-card:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .topic-row { grid-template-columns: 1fr; gap: 7px; }
+  .topic-row__score { text-align: left; }
   .form-grid--three { grid-template-columns: 1fr; }
   .json-compare,
   .audit-meta-grid,

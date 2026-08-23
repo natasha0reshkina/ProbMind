@@ -143,10 +143,8 @@ public sealed class PracticeService : IPracticeService
 
         var topic = await _uow.Topics.GetByIdAsync(question.TopicId, ct)
             ?? throw new InvalidOperationException("Topic missing.");
-        var options = (await _uow.AnswerOptions.WhereAsync(x => x.QuestionVersionId == version.Id, ct))
-            .OrderBy(x => x.SortOrder)
-            .Select(x => new AnswerOptionDto(x.Id, x.Text, x.SortOrder))
-            .ToArray();
+        var optionEntities = await _uow.AnswerOptions.WhereAsync(x => x.QuestionVersionId == version.Id, ct);
+        var options = AnswerOptionOrdering.ForSession(optionEntities, session.Id, question.Id);
 
         return new DiagnosticQuestionDto(
             question.Id,

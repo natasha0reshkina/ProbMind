@@ -129,21 +129,40 @@ export function DiagnosticPage() {
       <section className="question-card">
         <h2>{question.prompt}</h2>
         <div className="answer-grid">
-          {question.options.map((option) => (
+          {question.options.map((option, index) => (
             <button
               key={option.id}
+              type="button"
               className={`answer-option ${selected === option.id ? 'selected' : ''}`}
               disabled={Boolean(feedback) || submit.isPending}
-              onClick={() => {
-                setSelected(option.id)
-                void submit.mutateAsync(option.id)
-              }}
+              aria-pressed={selected === option.id}
+              onClick={() => setSelected(option.id)}
             >
-              <span>{String.fromCharCode(64 + option.sortOrder)}</span>
-              {option.text}
+              <span className="answer-letter">{String.fromCharCode(65 + index)}.</span>
+              <span className="answer-text">{option.text}</span>
             </button>
           ))}
         </div>
+
+        {!feedback ? (
+          <div className="answer-actions">
+            <button
+              type="button"
+              className="primary-button"
+              disabled={!selected || submit.isPending}
+              onClick={() => selected && void submit.mutateAsync(selected)}
+            >
+              {submit.isPending ? 'Проверяем ответ…' : 'Ответить'}
+            </button>
+            {!selected ? <span className="answer-hint">Выберите один вариант ответа</span> : null}
+          </div>
+        ) : null}
+
+        {submit.isError ? (
+          <div className="form-error" role="alert">
+            Не удалось отправить ответ. Попробуйте ещё раз.
+          </div>
+        ) : null}
 
         {feedback ? (
           <div className={`feedback ${feedback.isCorrect ? 'feedback--correct' : 'feedback--wrong'}`}>

@@ -241,12 +241,10 @@ public sealed class DiagnosticService : IDiagnosticService
         var topic = await _uow.Topics.GetByIdAsync(selected.TopicId, ct)
             ?? throw new InvalidOperationException("Question topic does not exist.");
 
-        var options = (await _uow.AnswerOptions.WhereAsync(
-                x => x.QuestionVersionId == version.Id,
-                ct))
-            .OrderBy(x => x.SortOrder)
-            .Select(x => new AnswerOptionDto(x.Id, x.Text, x.SortOrder))
-            .ToArray();
+        var optionEntities = await _uow.AnswerOptions.WhereAsync(
+            x => x.QuestionVersionId == version.Id,
+            ct);
+        var options = AnswerOptionOrdering.ForSession(optionEntities, session.Id, selected.Id);
 
         return new DiagnosticQuestionDto(
             selected.Id,
@@ -574,6 +572,7 @@ public sealed class DiagnosticService : IDiagnosticService
             ct);
 
         var exposure = records.SingleOrDefault();
+        var isNew = exposure is null;
         if (exposure is null)
         {
             exposure = new QuestionExposure
@@ -590,7 +589,8 @@ public sealed class DiagnosticService : IDiagnosticService
         exposure.NextEligibleAt = _clock.UtcNow.AddHours(
             wasCorrect ? Math.Min(336, 6 * exposure.ExposureCount) : 2);
         exposure.Touch();
-        _uow.QuestionExposures.Update(exposure);
+        if (!isNew)
+            _uow.QuestionExposures.Update(exposure);
     }
 
     private static DiagnosticSessionDto Map(DiagnosticSession session) =>

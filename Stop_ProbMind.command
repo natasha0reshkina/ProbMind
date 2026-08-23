@@ -1,4 +1,4 @@
 #!/bin/zsh
+set -e
 cd "${0:A:h}"
-docker compose down
-echo "ProbMind остановлен."
+docker compose down --remove-orphans
