@@ -36,8 +36,8 @@ public sealed class AdminService : IAdminService
             Action = AuditAction.RoleChanged,
             EntityType = nameof(User),
             EntityId = user.Id,
-            OldValueJson = JsonSerializer.Serialize(new { role = old }),
-            NewValueJson = JsonSerializer.Serialize(new { role = user.Role }),
+            OldValueJson = JsonSerializer.Serialize(new { role = old.ToString() }),
+            NewValueJson = JsonSerializer.Serialize(new { role = user.Role.ToString() }),
             RequestId = Guid.NewGuid().ToString("N")
         }, ct);
 
