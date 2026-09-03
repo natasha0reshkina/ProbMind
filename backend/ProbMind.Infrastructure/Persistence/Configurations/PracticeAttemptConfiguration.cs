@@ -16,5 +16,6 @@ public sealed class PracticeAttemptConfiguration : IEntityTypeConfiguration<Prac
         builder.HasIndex(x => x.PracticeSessionId);
         builder.HasIndex(x => x.UserId);
         builder.HasIndex(x => x.QuestionId);
+        builder.HasIndex(x => new { x.PracticeSessionId, x.QuestionId }).IsUnique();
     }
 }

@@ -205,6 +205,16 @@ export interface PracticeSession {
   completedAt?: string | null
 }
 
+export interface PracticeResult {
+  session: PracticeSession
+  correct: number
+  total: number
+  transferPassed: boolean
+  misconceptionConfidence?: number | null
+  misconceptionStatus?: MisconceptionStatus | null
+  updatedLearningPath?: LearningPath | null
+}
+
 export interface TimelinePoint {
   at: string
   value: number
@@ -278,13 +288,35 @@ export interface StudentListItem {
   email: string
   overallMastery: number
   activeMisconceptions: number
+  completedDiagnostics: number
+  answeredQuestions: number
+  wrongAnswers: number
+  diagnosticAccuracy: number
+  activeMisconceptionTitles: string[]
   lastActivityAt?: string | null
 }
 
-export interface StudentOverview extends StudentListItem {
+export interface StudentMistake {
+  id: string
+  submittedAt: string
+  source: string
+  topicName: string
+  prompt: string
+  selectedAnswer: string
+  correctAnswer: string
+  misconceptionTitle?: string | null
+}
+
+export interface StudentOverview {
+  userId: string
+  displayName: string
+  email: string
+  overallMastery: number
+  activeMisconceptions: number
   correctedMisconceptions: number
   completedDiagnostics: number
   completedPracticeSessions: number
+  lastActivityAt?: string | null
   topics: TopicProgress[]
   misconceptions: UserMisconception[]
 }
@@ -439,10 +471,13 @@ export interface NotificationItem {
 
 export interface CooccurrenceEdge {
   misconceptionAId: string
-  misconceptionACode: string
+  misconceptionATitle: string
   misconceptionBId: string
-  misconceptionBCode: string
+  misconceptionBTitle: string
   together: number
+  studentsA: number
+  studentsB: number
+  totalStudents: number
   jaccard: number
   lift: number
 }

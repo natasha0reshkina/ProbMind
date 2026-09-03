@@ -81,39 +81,42 @@ export function DataTable<T>({
       {(searchText || toolbar) && (
         <div className="data-table-toolbar">
           {searchText && (
-            <div className="search-field">
-              <Search size={16} />
+            <label className="search-field" aria-label="Поиск по таблице">
+              <Search size={17} aria-hidden="true" />
               <input
                 value={query}
                 placeholder={searchPlaceholder}
                 onChange={(event) => { setQuery(event.target.value); setPage(1) }}
               />
-            </div>
+            </label>
           )}
-          <div className="data-table-toolbar__right">{toolbar}</div>
+          {toolbar ? <div className="data-table-toolbar__right">{toolbar}</div> : null}
         </div>
       )}
 
-      <div className="table-panel data-table-scroll">
+      <div className="data-table-scroll">
         <table>
           <thead>
             <tr>
               {columns.map((column) => {
                 const active = sort?.key === column.key
+                const icon = active
+                  ? sort?.direction === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+                  : <ArrowUpDown size={14} />
                 return (
                   <th key={column.key} style={{ width: column.width, textAlign: column.align ?? 'left' }}>
-                    <button
-                      className={column.sortValue ? 'sortable-header' : 'plain-header'}
-                      onClick={() => toggleSort(column)}
-                      disabled={!column.sortValue}
-                    >
-                      {column.title}
-                      {column.sortValue && (
-                        active
-                          ? sort?.direction === 'asc' ? <ArrowUp size={13} /> : <ArrowDown size={13} />
-                          : <ArrowUpDown size={13} />
-                      )}
-                    </button>
+                    {column.sortValue ? (
+                      <button
+                        type="button"
+                        className={`sortable-header${active ? ' sortable-header--active' : ''}`}
+                        onClick={() => toggleSort(column)}
+                      >
+                        <span>{column.title}</span>
+                        {icon}
+                      </button>
+                    ) : (
+                      <span className="plain-header">{column.title}</span>
+                    )}
                   </th>
                 )
               })}
@@ -138,16 +141,18 @@ export function DataTable<T>({
         {!visible.length && <div className="table-empty">{emptyText}</div>}
       </div>
 
-      <div className="table-pagination">
-        <span>
-          {sorted.length ? `${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, sorted.length)}` : '0'} из {sorted.length}
-        </span>
-        <div className="pagination-buttons">
-          <button className="ghost-button small" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>Назад</button>
-          <span>Страница {safePage} / {totalPages}</span>
-          <button className="ghost-button small" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)}>Далее</button>
+      {sorted.length > pageSize && (
+        <div className="table-pagination">
+          <span>
+            {`${(safePage - 1) * pageSize + 1}–${Math.min(safePage * pageSize, sorted.length)} из ${sorted.length}`}
+          </span>
+          <div className="pagination-buttons">
+            <button type="button" className="ghost-button small" disabled={safePage <= 1} onClick={() => setPage(safePage - 1)}>Назад</button>
+            <span>Страница {safePage} из {totalPages}</span>
+            <button type="button" className="ghost-button small" disabled={safePage >= totalPages} onClick={() => setPage(safePage + 1)}>Далее</button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

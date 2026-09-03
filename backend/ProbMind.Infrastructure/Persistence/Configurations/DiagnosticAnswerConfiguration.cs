@@ -16,6 +16,7 @@ public sealed class DiagnosticAnswerConfiguration : IEntityTypeConfiguration<Dia
         builder.HasIndex(x => x.SessionId);
         builder.HasIndex(x => x.UserId);
         builder.HasIndex(x => x.QuestionId);
+        builder.HasIndex(x => new { x.SessionId, x.QuestionId }).IsUnique();
         builder.HasIndex(x => x.SubmittedAt);
     }
 }

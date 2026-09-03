@@ -1,4 +1,3 @@
-using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ProbMind.Application.Services;
@@ -18,20 +17,20 @@ public sealed class ExportsController : ControllerBase
     public async Task<IActionResult> Student(Guid studentId, CancellationToken ct)
     {
         var file = await _exports.StudentProfileCsvAsync(studentId, ct);
-        return File(Encoding.UTF8.GetBytes(file.TextContent), file.ContentType, file.FileName);
+        return File(file.Content, file.ContentType, file.FileName);
     }
 
     [HttpGet("cohort/misconceptions")]
     public async Task<IActionResult> Cohort(CancellationToken ct)
     {
         var file = await _exports.CohortMisconceptionsCsvAsync(ct);
-        return File(Encoding.UTF8.GetBytes(file.TextContent), file.ContentType, file.FileName);
+        return File(file.Content, file.ContentType, file.FileName);
     }
 
     [HttpGet("questions")]
     public async Task<IActionResult> Questions([FromQuery] Guid? topicId, CancellationToken ct)
     {
         var file = await _exports.QuestionAnalyticsCsvAsync(topicId, ct);
-        return File(Encoding.UTF8.GetBytes(file.TextContent), file.ContentType, file.FileName);
+        return File(file.Content, file.ContentType, file.FileName);
     }
 }

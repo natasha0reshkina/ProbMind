@@ -31,7 +31,7 @@ public sealed class AuthService : IAuthService
     {
         var email = Guard.Email(request.Email);
         var displayName = Guard.Required(request.DisplayName, "displayName", 120);
-        ValidatePassword(request.Password);
+        var password = ValidatePassword(request.Password);
 
         if (await _uow.Users.AnyAsync(x => x.Email == email, ct))
             throw new InvalidOperationException("User with this e-mail already exists.");
@@ -40,7 +40,7 @@ public sealed class AuthService : IAuthService
         {
             Email = email,
             DisplayName = displayName,
-            PasswordHash = _passwordHasher.Hash(request.Password),
+            PasswordHash = _passwordHasher.Hash(password),
             Role = UserRole.Student,
             IsActive = true
         };
@@ -63,6 +63,7 @@ public sealed class AuthService : IAuthService
     public async Task<AuthResponse> LoginAsync(LoginRequest request, CancellationToken ct = default)
     {
         var email = Guard.Email(request.Email);
+        var password = Guard.Required(request.Password, "password", 200);
         var users = await _uow.Users.WhereAsync(x => x.Email == email, ct);
         var user = users.SingleOrDefault()
             ?? throw new UnauthorizedAccessException("Invalid credentials.");
@@ -70,7 +71,7 @@ public sealed class AuthService : IAuthService
         if (!user.IsActive)
             throw new UnauthorizedAccessException("Account is inactive.");
 
-        if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
+        if (!_passwordHasher.Verify(password, user.PasswordHash))
             throw new UnauthorizedAccessException("Invalid credentials.");
 
         user.LastLoginAt = _clock.UtcNow;
@@ -172,15 +173,17 @@ public sealed class AuthService : IAuthService
     private static AuthUserDto Map(User user) =>
         new(user.Id, user.Email, user.DisplayName, user.Role);
 
-    private static void ValidatePassword(string password)
+    private static string ValidatePassword(string? password)
     {
-        if (password.Length < 10)
+        var value = Guard.Required(password, "password", 200);
+        if (value.Length < 10)
             throw new ArgumentException("Password must contain at least 10 characters.", "password");
-        if (!password.Any(char.IsUpper))
+        if (!value.Any(char.IsUpper))
             throw new ArgumentException("Password must contain an uppercase letter.", "password");
-        if (!password.Any(char.IsLower))
+        if (!value.Any(char.IsLower))
             throw new ArgumentException("Password must contain a lowercase letter.", "password");
-        if (!password.Any(char.IsDigit))
+        if (!value.Any(char.IsDigit))
             throw new ArgumentException("Password must contain a digit.", "password");
+        return value;
     }
 }

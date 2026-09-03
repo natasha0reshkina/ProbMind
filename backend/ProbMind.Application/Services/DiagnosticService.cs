@@ -48,17 +48,9 @@ public sealed class DiagnosticService : IDiagnosticService
     {
         var count = Guard.Range(request.QuestionCount, 10, 30, "questionCount");
 
-        var active = await _uow.DiagnosticSessions.WhereAsync(
-            x => x.UserId == userId &&
-                 (x.Status == DiagnosticStatus.Created || x.Status == DiagnosticStatus.InProgress),
-            ct);
-
-        foreach (var stale in active)
-        {
-            stale.Status = DiagnosticStatus.Cancelled;
-            stale.Touch();
-            _uow.DiagnosticSessions.Update(stale);
-        }
+        var resumable = await NormalizeActiveSessionAsync(userId, ct);
+        if (resumable is not null)
+            return Map(resumable);
 
         var session = new DiagnosticSession
         {
@@ -88,6 +80,8 @@ public sealed class DiagnosticService : IDiagnosticService
         Guid userId,
         CancellationToken ct = default)
     {
+        await NormalizeActiveSessionAsync(userId, ct);
+
         var sessions = await _uow.DiagnosticSessions.WhereAsync(x => x.UserId == userId, ct);
         return sessions
             .OrderByDescending(x => x.CreatedAt)
@@ -100,7 +94,15 @@ public sealed class DiagnosticService : IDiagnosticService
         Guid sessionId,
         CancellationToken ct = default)
     {
-        return Map(await GetOwnedSessionAsync(userId, sessionId, ct));
+        var requested = await GetOwnedSessionAsync(userId, sessionId, ct);
+        if (requested.Status is DiagnosticStatus.Created or DiagnosticStatus.InProgress)
+        {
+            var canonical = await NormalizeActiveSessionAsync(userId, ct);
+            if (canonical is not null)
+                return Map(canonical);
+        }
+
+        return Map(requested);
     }
 
     public async Task<DiagnosticQuestionDto?> NextQuestionAsync(
@@ -227,7 +229,8 @@ public sealed class DiagnosticService : IDiagnosticService
                 currentVersion.IsTransferQuestion));
         }
 
-        var ranking = _selector.Rank(candidates, _clock.UtcNow, take: 10);
+        var selectionReferenceTime = session.StartedAt ?? session.CreatedAt;
+        var ranking = _selector.Rank(candidates, selectionReferenceTime, take: 10);
         var best = ranking.FirstOrDefault();
 
         if (best is null)
@@ -277,6 +280,9 @@ public sealed class DiagnosticService : IDiagnosticService
 
         var question = await _uow.Questions.GetByIdAsync(request.QuestionId, ct)
             ?? throw new KeyNotFoundException("Question not found.");
+
+        if (question.Kind != QuestionKind.Diagnostic || question.Status != ContentStatus.Published)
+            throw new InvalidOperationException("Question is not available for diagnostic use.");
 
         var version = await _uow.QuestionVersions.GetByIdAsync(request.QuestionVersionId, ct)
             ?? throw new KeyNotFoundException("Question version not found.");
@@ -401,7 +407,7 @@ public sealed class DiagnosticService : IDiagnosticService
         if (session.Status is DiagnosticStatus.ReportReady or DiagnosticStatus.Completed)
             return await ReportAsync(userId, sessionId, ct);
 
-        if (session.AnsweredQuestionCount < Math.Min(5, session.PlannedQuestionCount))
+        if (session.AnsweredQuestionCount < session.PlannedQuestionCount)
             throw new InvalidOperationException("Not enough answers to complete diagnostic.");
 
         session.Status = DiagnosticStatus.Analyzing;
@@ -522,6 +528,51 @@ public sealed class DiagnosticService : IDiagnosticService
             misconceptions,
             report.SummaryMarkdown,
             report.GeneratedAt);
+    }
+
+    private async Task<DiagnosticSession?> NormalizeActiveSessionAsync(
+        Guid userId,
+        CancellationToken ct)
+    {
+        var active = await _uow.DiagnosticSessions.WhereAsync(
+            x => x.UserId == userId &&
+                 (x.Status == DiagnosticStatus.Created || x.Status == DiagnosticStatus.InProgress),
+            ct);
+
+        if (active.Count == 0)
+            return null;
+
+        var ordered = active
+            .OrderByDescending(x => x.AnsweredQuestionCount)
+            .ThenByDescending(x => x.UpdatedAt)
+            .ThenByDescending(x => x.CreatedAt)
+            .ToArray();
+
+        var canonical = ordered[0];
+        var changed = false;
+
+        if (canonical.Status == DiagnosticStatus.Created)
+        {
+            canonical.Status = DiagnosticStatus.InProgress;
+            canonical.StartedAt ??= _clock.UtcNow;
+            canonical.Touch();
+            _uow.DiagnosticSessions.Update(canonical);
+            changed = true;
+        }
+
+        foreach (var duplicate in ordered.Skip(1))
+        {
+            duplicate.Status = DiagnosticStatus.Cancelled;
+            duplicate.CompletedAt ??= _clock.UtcNow;
+            duplicate.Touch();
+            _uow.DiagnosticSessions.Update(duplicate);
+            changed = true;
+        }
+
+        if (changed)
+            await _uow.SaveChangesAsync(ct);
+
+        return canonical;
     }
 
     private async Task<DiagnosticSession> GetOwnedSessionAsync(

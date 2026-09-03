@@ -41,38 +41,62 @@ public sealed class TeacherService : ITeacherService
             ct);
         var masteries = await _uow.TopicMasteries.ListAsync(ct);
         var misconceptions = await _uow.UserMisconceptions.ListAsync(ct);
+        var misconceptionCatalog = (await _uow.Misconceptions.ListAsync(ct)).ToDictionary(x => x.Id);
+        var diagnostics = await _uow.DiagnosticSessions.ListAsync(ct);
+        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
         var events = await _uow.ActivityEvents.ListAsync(ct);
 
         return students
             .Select(student =>
             {
-                var userMastery = masteries.Where(x => x.UserId == student.Id).ToArray();
+                var userMastery = masteries.Where(x => x.UserId == student.Id && x.ObservationCount > 0).ToArray();
                 var userMisconceptions = misconceptions.Where(x => x.UserId == student.Id).ToArray();
+                var userAnswers = answers.Where(x => x.UserId == student.Id).ToArray();
                 var lastActivity = events
                     .Where(x => x.UserId == student.Id)
                     .OrderByDescending(x => x.OccurredAt)
                     .Select(x => (DateTimeOffset?)x.OccurredAt)
                     .FirstOrDefault();
+                var activeStates = userMisconceptions
+                    .Where(IsActive)
+                    .OrderByDescending(x => x.Confidence)
+                    .ToArray();
+                var activeTitles = activeStates
+                    .Where(x => misconceptionCatalog.ContainsKey(x.MisconceptionId))
+                    .Select(x => misconceptionCatalog[x.MisconceptionId].Title)
+                    .Distinct()
+                    .ToArray();
+                var answered = userAnswers.Length;
+                var wrong = userAnswers.Count(x => !x.IsCorrect);
+                var accuracy = answered == 0 ? 0d : userAnswers.Count(x => x.IsCorrect) / (double)answered;
+                var completedDiagnostics = diagnostics.Count(x =>
+                    x.UserId == student.Id && x.Status == DiagnosticStatus.ReportReady);
 
                 return new StudentListItemDto(
                     student.Id,
                     student.DisplayName,
                     student.Email,
-                    userMastery.Length == 0 ? .5d : userMastery.Average(x => x.Mastery),
-                    userMisconceptions.Count(IsActive),
+                    userMastery.Length == 0 ? 0d : userMastery.Average(x => x.Mastery),
+                    activeStates.Length,
+                    completedDiagnostics,
+                    answered,
+                    wrong,
+                    accuracy,
+                    activeTitles,
                     lastActivity);
             })
-            .OrderByDescending(x => x.ActiveMisconceptions)
-            .ThenBy(x => x.OverallMastery)
+            .OrderByDescending(x => x.WrongAnswers)
+            .ThenBy(x => x.DiagnosticAccuracy)
+            .ThenBy(x => x.DisplayName)
             .ToArray();
     }
 
     public async Task<StudentOverviewDto> StudentAsync(Guid studentId, CancellationToken ct = default)
     {
         var student = await _uow.Users.GetByIdAsync(studentId, ct)
-            ?? throw new KeyNotFoundException("Student not found.");
+            ?? throw new KeyNotFoundException("Студент не найден.");
         if (student.Role != UserRole.Student)
-            throw new InvalidOperationException("Requested user is not a student.");
+            throw new InvalidOperationException("Указанная учётная запись не принадлежит студенту.");
 
         var topics = await _learner.GetTopicMasteryAsync(studentId, ct);
         var misconceptions = await _learner.ListMisconceptionsAsync(studentId, ct);
@@ -84,7 +108,9 @@ public sealed class TeacherService : ITeacherService
             student.Id,
             student.DisplayName,
             student.Email,
-            topics.Count == 0 ? .5d : topics.Average(x => x.Mastery),
+            topics.Any(x => x.ObservationCount > 0)
+                ? topics.Where(x => x.ObservationCount > 0).Average(x => x.Mastery)
+                : 0d,
             misconceptions.Count(x => IsActiveStatus(x.Status)),
             misconceptions.Count(x => x.Status == MisconceptionStatus.Corrected),
             diagnostics.Count(x => x.Status == DiagnosticStatus.ReportReady),
@@ -92,6 +118,75 @@ public sealed class TeacherService : ITeacherService
             events.OrderByDescending(x => x.OccurredAt).Select(x => (DateTimeOffset?)x.OccurredAt).FirstOrDefault(),
             topics,
             misconceptions);
+    }
+
+    public async Task<IReadOnlyList<StudentMistakeDto>> StudentMistakesAsync(
+        Guid studentId,
+        int limit = 50,
+        CancellationToken ct = default)
+    {
+        var student = await _uow.Users.GetByIdAsync(studentId, ct)
+            ?? throw new KeyNotFoundException("Студент не найден.");
+        if (student.Role != UserRole.Student)
+            throw new InvalidOperationException("Указанная учётная запись не принадлежит студенту.");
+
+        var diagnostic = (await _uow.DiagnosticAnswers.WhereAsync(
+                x => x.UserId == studentId && !x.IsCorrect,
+                ct))
+            .Select(x => (x.Id, x.SubmittedAt, x.QuestionId, x.QuestionVersionId, x.AnswerOptionId, Source: "Диагностика"));
+        var practice = (await _uow.PracticeAttempts.WhereAsync(
+                x => x.UserId == studentId && !x.IsCorrect,
+                ct))
+            .Select(x => (x.Id, x.SubmittedAt, x.QuestionId, x.QuestionVersionId, x.AnswerOptionId, Source: "Тренировка"));
+
+        var attempts = diagnostic
+            .Concat(practice)
+            .OrderByDescending(x => x.SubmittedAt)
+            .Take(Math.Clamp(limit, 1, 200))
+            .ToArray();
+
+        if (attempts.Length == 0)
+            return Array.Empty<StudentMistakeDto>();
+
+        var questions = (await _uow.Questions.ListAsync(ct)).ToDictionary(x => x.Id);
+        var versions = (await _uow.QuestionVersions.ListAsync(ct)).ToDictionary(x => x.Id);
+        var options = await _uow.AnswerOptions.ListAsync(ct);
+        var optionById = options.ToDictionary(x => x.Id);
+        var topics = (await _uow.Topics.ListAsync(ct)).ToDictionary(x => x.Id);
+        var misconceptions = (await _uow.Misconceptions.ListAsync(ct)).ToDictionary(x => x.Id);
+
+        var result = new List<StudentMistakeDto>();
+        foreach (var attempt in attempts)
+        {
+            if (!questions.TryGetValue(attempt.QuestionId, out var question) ||
+                !versions.TryGetValue(attempt.QuestionVersionId, out var version) ||
+                !optionById.TryGetValue(attempt.AnswerOptionId, out var selected))
+                continue;
+
+            var correct = options.FirstOrDefault(x =>
+                x.QuestionVersionId == attempt.QuestionVersionId && x.IsCorrect);
+            var topicName = topics.TryGetValue(question.TopicId, out var topic)
+                ? topic.NameRu
+                : "Без темы";
+            string? misconceptionTitle = null;
+            if (selected.MisconceptionId.HasValue &&
+                misconceptions.TryGetValue(selected.MisconceptionId.Value, out var misconception))
+            {
+                misconceptionTitle = misconception.Title;
+            }
+
+            result.Add(new StudentMistakeDto(
+                attempt.Id,
+                attempt.SubmittedAt,
+                attempt.Source,
+                topicName,
+                version.Prompt,
+                selected.Text,
+                correct?.Text ?? "Правильный ответ не указан",
+                misconceptionTitle));
+        }
+
+        return result;
     }
 
     public async Task<IReadOnlyList<QuestionAnalyticsDto>> QuestionAnalyticsAsync(

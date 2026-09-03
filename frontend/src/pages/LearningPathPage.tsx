@@ -5,6 +5,14 @@ import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import type { LearningPath } from '../types/api'
 
+function localizedReason(reason: string) {
+  return reason
+    .replace(': confidence in «', ': уверенность в наличии ошибки «')
+    .replace(/» is\s*([0-9]+)\s*%; mastery\s*([0-9]+)\s*%\.?/gi, '» — $1%; освоение темы — $2%.')
+    .replace(': topic mastery is ', ': освоение темы — ')
+    .replace(/; spaced-review priority\s*([0-9]+)\s*%\.?/gi, '; приоритет повторения — $1%.')
+}
+
 export function LearningPathPage() {
   const client = useQueryClient()
   const { data, isLoading } = useQuery({
@@ -34,7 +42,7 @@ export function LearningPathPage() {
       />
 
       <div className="table-frame">
-        <table className="academic-table">
+        <table className="academic-table learning-path-table">
           <thead>
             <tr>
               <th>№</th>
@@ -48,9 +56,9 @@ export function LearningPathPage() {
           <tbody>
             {data.steps.map((step) => (
               <tr key={step.id}>
-                <td>{step.position}</td>
+                <td className="learning-path-position">{step.position}</td>
                 <td><strong>{step.topicName}</strong>{step.misconceptionTitle ? <div className="table-secondary">{step.misconceptionTitle}</div> : null}</td>
-                <td><span className="table-wrap-text">{step.reason}</span></td>
+                <td><span className="table-wrap-text">{localizedReason(step.reason)}</span></td>
                 <td className="numeric-cell">{Math.round(step.priority * 100)}%</td>
                 <td><StatusBadge value={step.status} /></td>
                 <td>

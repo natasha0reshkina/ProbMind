@@ -40,6 +40,8 @@ public static class DependencyInjection
 
         services.AddSingleton<IRequestValidator, RegisterRequestValidator>();
         services.AddSingleton<IRequestValidator, LoginRequestValidator>();
+        services.AddSingleton<IRequestValidator, RefreshRequestValidator>();
+        services.AddSingleton<IRequestValidator, LogoutRequestValidator>();
         services.AddSingleton<IRequestValidator, StartDiagnosticRequestValidator>();
         services.AddSingleton<IRequestValidator, SubmitDiagnosticAnswerRequestValidator>();
         services.AddSingleton<IRequestValidator, StartPracticeRequestValidator>();

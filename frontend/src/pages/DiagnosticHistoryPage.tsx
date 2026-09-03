@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client'
+import { EmptyState } from '../components/EmptyState'
+import { ErrorView } from '../components/ErrorView'
 import { LoadingView } from '../components/LoadingView'
 import { StatusBadge } from '../components/StatusBadge'
 import type { DiagnosticComparison, DiagnosticSession } from '../types/api'
@@ -43,36 +45,49 @@ export function DiagnosticHistoryPage() {
   })
 
   if (history.isLoading) return <LoadingView />
+  if (history.isError) return <ErrorView message="Не удалось загрузить историю диагностик." />
 
   return (
     <div className="academic-page">
       <header className="simple-page-header">
         <div>
           <h1>История диагностик</h1>
-          <p>Завершённые диагностики сохраняются вместе с результатами и версиями заданий.</p>
+          <p>Здесь сохраняются завершённые и незавершённые диагностические сессии. Незавершённую диагностику можно продолжить с того места, где она была остановлена.</p>
         </div>
       </header>
 
       <section className="plain-section">
         <h2>Диагностические сессии</h2>
-        <div className="table-frame">
-          <table className="academic-table">
-            <thead>
-              <tr><th>Дата</th><th>Статус</th><th>Вопросы</th><th>Точность</th><th /></tr>
-            </thead>
-            <tbody>
-              {(history.data ?? []).map((item) => (
-                <tr key={item.id}>
-                  <td>{item.startedAt ? new Date(item.startedAt).toLocaleString('ru-RU') : '—'}</td>
-                  <td><StatusBadge value={item.status} /></td>
-                  <td>{item.answeredQuestionCount} / {item.plannedQuestionCount}</td>
-                  <td>{item.overallScore == null ? '—' : percent(item.overallScore)}</td>
-                  <td>{item.status === 'ReportReady' ? <Link to={`/diagnostics/${item.id}/report`}>Открыть отчёт</Link> : null}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {(history.data ?? []).length === 0 ? (
+          <EmptyState title="Диагностик пока нет" description="После первой попытки здесь появятся дата, статус и итоговый результат." />
+        ) : (
+          <div className="table-frame">
+            <table className="academic-table">
+              <thead>
+                <tr><th>Дата</th><th>Статус</th><th>Вопросы</th><th>Точность</th><th>Действие</th></tr>
+              </thead>
+              <tbody>
+                {(history.data ?? []).map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.startedAt ? new Date(item.startedAt).toLocaleString('ru-RU') : '—'}</td>
+                    <td><StatusBadge value={item.status} /></td>
+                    <td>{item.answeredQuestionCount} / {item.plannedQuestionCount}</td>
+                    <td>{item.overallScore == null ? '—' : percent(item.overallScore)}</td>
+                    <td>
+                      {item.status === 'ReportReady' ? (
+                        <Link className="secondary-button history-action-button" to={`/diagnostics/${item.id}/report`}>Открыть отчёт</Link>
+                      ) : item.status === 'InProgress' ? (
+                        <Link className="primary-button history-action-button" to={`/diagnostics/${item.id}/continue`}>Продолжить</Link>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {completed.length >= 2 ? (

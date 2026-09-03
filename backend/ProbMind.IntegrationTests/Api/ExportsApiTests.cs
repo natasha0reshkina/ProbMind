@@ -17,6 +17,6 @@ public sealed class ExportsApiTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Contains("text/csv", response.Content.Headers.ContentType?.MediaType ?? string.Empty);
-        Assert.Contains(',', text);
+        Assert.Contains(";", text);
     }
 }

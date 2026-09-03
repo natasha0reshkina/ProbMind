@@ -1,127 +1,176 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../api/client'
-import { BarChartPanel, DonutChartPanel } from '../components/ChartPanel'
+import { BarChartPanel } from '../components/ChartPanel'
 import { DataTable, type DataColumn } from '../components/DataTable'
+import { KpiStrip } from '../components/KpiStrip'
 import { PageHeader } from '../components/PageHeader'
 import { ProgressBar } from '../components/ProgressBar'
-import { StatusBadge } from '../components/StatusBadge'
-import type { AdvancedSystemOverview, CohortAnalytics, ContentDrift, InterventionEffectiveness, Reliability } from '../types/api'
-import { number, percent } from '../utils/format'
+import type { CohortAnalytics, InterventionEffectiveness, StudentListItem } from '../types/api'
+import { percent } from '../utils/format'
 
 export function TeacherAnalyticsPage() {
+  const navigate = useNavigate()
   const cohort = useQuery({ queryKey: ['cohort'], queryFn: async () => (await api.get<CohortAnalytics>('/statistics/cohort')).data })
-  const reliability = useQuery({ queryKey: ['teacher-reliability'], queryFn: async () => (await api.get<Reliability>('/teacher/diagnostics/reliability')).data })
+  const students = useQuery({ queryKey: ['teacher-students'], queryFn: async () => (await api.get<StudentListItem[]>('/teacher/students')).data })
   const interventions = useQuery({ queryKey: ['teacher-interventions'], queryFn: async () => (await api.get<InterventionEffectiveness[]>('/teacher/interventions/effectiveness')).data })
-  const system = useQuery({ queryKey: ['advanced-system'], queryFn: async () => (await api.get<AdvancedSystemOverview>('/advanced-analytics/system')).data })
-  const drift = useQuery({ queryKey: ['content-drift'], queryFn: async () => (await api.get<ContentDrift[]>('/advanced-analytics/content/drift')).data })
 
-  const prevalence = (cohort.data?.misconceptions ?? []).slice(0, 12).map((item) => ({
-    name: item.title.length > 24 ? `${item.title.slice(0, 24)}…` : item.title,
-    prevalence: item.prevalence,
-  }))
+  const studentRows = [...(students.data ?? [])]
+    .filter((row) => row.answeredQuestions > 0)
+    .sort((a, b) => b.wrongAnswers - a.wrongAnswers || a.diagnosticAccuracy - b.diagnosticAccuracy)
+    .slice(0, 10)
+
+  const totalWrong = (students.data ?? []).reduce((sum, row) => sum + row.wrongAnswers, 0)
+  const totalAnswers = (students.data ?? []).reduce((sum, row) => sum + row.answeredQuestions, 0)
+  const weightedAccuracy = totalAnswers === 0 ? 0 : (students.data ?? []).reduce((sum, row) => sum + row.diagnosticAccuracy * row.answeredQuestions, 0) / totalAnswers
+  const studentsWithResults = (students.data ?? []).filter((row) => row.answeredQuestions > 0).length
+  const studentsWithErrors = (students.data ?? []).filter((row) => row.activeMisconceptions > 0).length
+
+  const prevalence = studentsWithResults >= 3
+    ? (cohort.data?.misconceptions ?? [])
+      .filter((item) => item.studentsAffected > 0)
+      .slice(0, 10)
+      .map((item) => ({ name: item.title, prevalence: item.prevalence }))
+    : []
+
+  const topicRows = (cohort.data?.meanTopicMastery ?? []).filter((topic) => topic.observationCount > 0)
 
   const effectiveness = [...(interventions.data ?? [])]
+    .filter((item) => item.learners > 0)
     .sort((a, b) => b.compositeEffectiveness - a.compositeEffectiveness)
-    .slice(0, 10)
-    .map((item) => ({ code: item.code.replaceAll('_', ' '), effectiveness: item.compositeEffectiveness }))
+    .slice(0, 8)
+    .map((item) => ({ name: item.title, effectiveness: item.compositeEffectiveness }))
 
-  const driftFlagged = (drift.data ?? []).filter((item) => item.requiresReview)
-
-  const driftColumns: DataColumn<ContentDrift>[] = [
-    { key: 'code', title: 'Задание', render: (row) => <code>{row.code}</code>, sortValue: (row) => row.code },
-    { key: 'shift', title: 'Изменение точности', render: (row) => percent(row.accuracyShift, 1), sortValue: (row) => row.accuracyShift, align: 'right' },
-    { key: 'time', title: 'Изменение времени', render: (row) => number(row.responseTimeShift, 2), sortValue: (row) => row.responseTimeShift, align: 'right' },
-    { key: 'entropy', title: 'Изменение энтропии', render: (row) => number(row.entropyShift, 2), sortValue: (row) => row.entropyShift, align: 'right' },
-    { key: 'score', title: 'Оценка изменения', render: (row) => <strong>{number(row.driftScore, 2)}</strong>, sortValue: (row) => row.driftScore, align: 'right' },
-    { key: 'review', title: 'Состояние', render: (row) => <StatusBadge value={row.requiresReview ? 'RequiresReview' : 'Stable'} />, sortValue: (row) => row.requiresReview ? 1 : 0 },
-    { key: 'reason', title: 'Основание', render: (row) => <span className="table-wrap-text">{row.reason}</span> },
-  ]
+  const studentColumns: DataColumn<StudentListItem>[] = useMemo(() => [
+    {
+      key: 'student',
+      title: 'Студент',
+      width: '21%',
+      render: (row) => <div><strong>{row.displayName}</strong><span className="table-secondary">{row.email}</span></div>,
+      sortValue: (row) => row.displayName,
+    },
+    {
+      key: 'result',
+      title: 'Правильных ответов',
+      render: (row) => percent(row.diagnosticAccuracy),
+      sortValue: (row) => row.diagnosticAccuracy,
+      align: 'right',
+    },
+    {
+      key: 'wrong',
+      title: 'Неверно',
+      render: (row) => <strong>{row.wrongAnswers}</strong>,
+      sortValue: (row) => row.wrongAnswers,
+      align: 'center',
+    },
+    {
+      key: 'errors',
+      title: 'Что вызывает затруднение',
+      width: '45%',
+      render: (row) => row.activeMisconceptionTitles.length
+        ? <div className="teacher-error-list">{row.activeMisconceptionTitles.slice(0, 3).map((title) => <span key={title}>{title}</span>)}</div>
+        : <span className="muted">Устойчивые ошибки не выявлены</span>,
+      sortValue: (row) => row.activeMisconceptions,
+    },
+  ], [])
 
   return (
     <div>
       <PageHeader
+        eyebrow="Преподаватель"
         title="Сводка по группе"
-        description="Результаты студентов, показатели качества диагностики и статистика по заданиям."
+        description="Здесь собраны показатели, которые помогают понять результаты студентов: кто уже прошёл диагностику, где больше неверных ответов и какие типичные ошибки встречаются чаще."
       />
 
-      <section className="plain-section">
-        <h2>Основные показатели</h2>
-        <dl className="summary-list">
-          <div><dt>Студентов</dt><dd>{cohort.data?.students ?? 0}</dd></div>
-          <div><dt>Средняя точность</dt><dd>{percent(cohort.data?.meanAccuracy)}</dd></div>
-          <div><dt>Среднее освоение</dt><dd>{percent(system.data?.meanMastery)}</dd></div>
-          <div><dt>Коэффициент α Кронбаха</dt><dd>{number(reliability.data?.cronbachAlpha, 2)}</dd></div>
-        </dl>
+      <KpiStrip items={[
+        { label: 'Студентов в группе', value: cohort.data?.students ?? 0 },
+        { label: 'Есть результаты', value: studentsWithResults },
+        { label: 'Доля правильных ответов', value: totalAnswers > 0 ? percent(weightedAccuracy) : '—' },
+        { label: 'Неверных ответов', value: totalWrong },
+        { label: 'Есть устойчивые ошибки', value: studentsWithErrors },
+      ]} />
+
+      <section className="panel">
+        <div className="panel-title">
+          <div>
+            <h2>Студенты, которым стоит уделить внимание</h2>
+            <p className="muted chart-subtitle">Сначала показаны студенты с большим числом неверных ответов. Строка открывает подробный разбор конкретного студента.</p>
+          </div>
+        </div>
+        <DataTable
+          rows={studentRows}
+          columns={studentColumns}
+          rowKey={(row) => row.userId}
+          searchText={(row) => `${row.displayName} ${row.email} ${row.activeMisconceptionTitles.join(' ')}`}
+          searchPlaceholder="Студент или типичная ошибка…"
+          pageSize={10}
+          onRowClick={(row) => navigate(`/teacher/students/${row.userId}`)}
+          emptyText="Пока недостаточно результатов студентов"
+        />
       </section>
 
       <section className="plain-section">
         <h2>Средний результат по темам</h2>
-        <div className="topic-list">
-          {(cohort.data?.meanTopicMastery ?? []).map((topic) => (
-            <div className="topic-row" key={topic.topicId}>
-              <div className="topic-row__meta">
-                <strong>{topic.name}</strong>
-                <span>{topic.observationCount} наблюдений · неопределённость {percent(topic.uncertainty)}</span>
+        {topicRows.length > 0 ? (
+          <div className="topic-list">
+            {topicRows.map((topic) => (
+              <div className="topic-row" key={topic.topicId}>
+                <div className="topic-row__meta">
+                  <strong>{topic.name}</strong>
+                  <span>{topic.observationCount} наблюдений</span>
+                </div>
+                <div className="topic-progress-cell"><ProgressBar value={topic.mastery} /><span>{percent(topic.mastery)}</span></div>
               </div>
-              <div className="topic-progress-cell"><ProgressBar value={topic.mastery} /><span>{percent(topic.mastery)}</span></div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <div className="two-column">
-        <BarChartPanel
-          title="Распространённость типичных ошибок"
-          subtitle="Доля студентов, у которых обнаружен соответствующий тип ошибки."
-          data={prevalence}
-          xKey="name"
-          series={[{ key: 'prevalence', label: 'Доля студентов' }]}
-          percent
-          horizontal
-          height={360}
-        />
-        <BarChartPanel
-          title="Результаты коррекционных заданий"
-          subtitle="Сводный показатель по повторным заданиям и заданиям на перенос."
-          data={effectiveness}
-          xKey="code"
-          series={[{ key: 'effectiveness', label: 'Результат' }]}
-          percent
-          horizontal
-          height={360}
-        />
-      </div>
-
-      <section className="plain-section">
-        <h2>Состояние банка заданий</h2>
-        <div className="two-column">
-          <DonutChartPanel
-            title="Стабильность заданий"
-            subtitle="Сравнение стабильных заданий и заданий, которые стоит проверить."
-            data={[
-              { name: 'Стабильно', value: Math.max(0, (system.data?.questions ?? drift.data?.length ?? 0) - driftFlagged.length) },
-              { name: 'Нужна проверка', value: driftFlagged.length },
-            ]}
-            height={280}
-          />
-          <dl className="summary-list summary-list--two">
-            <div><dt>Обработано ответов</dt><dd>{system.data?.answers.toLocaleString('ru-RU') ?? cohort.data?.answers ?? '—'}</dd></div>
-            <div><dt>Активных типичных ошибок</dt><dd>{system.data?.activeMisconceptions ?? '—'}</dd></div>
-            <div><dt>Студентов, которым нужно внимание</dt><dd>{system.data?.atRiskLearners ?? '—'}</dd></div>
-            <div><dt>Средняя точность диагностики</dt><dd>{percent(system.data?.meanDiagnosticAccuracy)}</dd></div>
-          </dl>
-        </div>
-      </section>
-
-      <section className="plain-section">
-        <div className="section-heading-row">
-          <div>
-            <h2>Изменение характеристик заданий</h2>
-            <p>Сравнение ранних и недавних ответов по точности, времени и распределению вариантов.</p>
+            ))}
           </div>
-        </div>
-        <DataTable rows={drift.data ?? []} columns={driftColumns} rowKey={(row) => row.questionId} searchText={(row) => `${row.code} ${row.reason}`} pageSize={12} />
+        ) : (
+          <div className="teacher-inline-empty"><strong>Пока нет результатов по темам</strong><p>Показатели появятся после прохождения студентами диагностических заданий.</p></div>
+        )}
       </section>
+
+      <div className="two-column teacher-summary-charts">
+        {studentsWithResults >= 3 ? (
+          <BarChartPanel
+            title="Наиболее частые типичные ошибки"
+            subtitle="Доля студентов с результатами диагностики, у которых сейчас сохраняется соответствующее затруднение."
+            data={prevalence}
+            xKey="name"
+            series={[{ key: 'prevalence', label: 'Доля студентов' }]}
+            percent
+            horizontal
+            height={350}
+          />
+        ) : (
+          <section className="teacher-data-note">
+            <div className="teacher-data-note__title"><h2>Наиболее частые типичные ошибки</h2></div>
+            <div className="teacher-data-note__body">
+              <strong>Для группового сравнения пока мало данных</strong>
+              <p>Нужно получить результаты как минимум трёх студентов. До этого момента ориентируйтесь на индивидуальные разборы в разделе «Студенты».</p>
+            </div>
+          </section>
+        )}
+        {effectiveness.length > 0 ? (
+          <BarChartPanel
+            title="Результаты повторной работы"
+            subtitle="Показано, насколько успешно студенты справляются с заданиями после разбора конкретных затруднений."
+            data={effectiveness}
+            xKey="name"
+            series={[{ key: 'effectiveness', label: 'Результат' }]}
+            percent
+            horizontal
+            height={350}
+          />
+        ) : (
+          <section className="teacher-data-note">
+            <div className="teacher-data-note__title"><h2>Результаты повторной работы</h2></div>
+            <div className="teacher-data-note__body">
+              <strong>Коррекционных попыток пока недостаточно</strong>
+              <p>Этот блок появится после того, как студенты выполнят дополнительные задания по выявленным затруднениям.</p>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   )
 }

@@ -19,7 +19,22 @@ public sealed record StudentListItemDto(
     string Email,
     double OverallMastery,
     int ActiveMisconceptions,
+    int CompletedDiagnostics,
+    int AnsweredQuestions,
+    int WrongAnswers,
+    double DiagnosticAccuracy,
+    IReadOnlyList<string> ActiveMisconceptionTitles,
     DateTimeOffset? LastActivityAt);
+
+public sealed record StudentMistakeDto(
+    Guid Id,
+    DateTimeOffset SubmittedAt,
+    string Source,
+    string TopicName,
+    string Prompt,
+    string SelectedAnswer,
+    string CorrectAnswer,
+    string? MisconceptionTitle);
 
 public sealed record QuestionAnalyticsDto(
     Guid QuestionId,

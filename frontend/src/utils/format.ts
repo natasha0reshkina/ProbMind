@@ -33,3 +33,17 @@ export function bytes(value?: number | null) {
   }
   return `${size.toFixed(unit === 0 ? 0 : 1)} ${units[unit]}`
 }
+
+
+export function questionLabel(code: string) {
+  const match = code.match(/^(conditional_probability|independence|p_value|law_large_numbers|randomness)_(\d+)$/)
+  if (!match) return 'Учебное задание'
+  const topics: Record<string, string> = {
+    conditional_probability: 'Условная вероятность',
+    independence: 'Независимость',
+    p_value: 'p-value',
+    law_large_numbers: 'Закон больших чисел',
+    randomness: 'Случайность',
+  }
+  return `${topics[match[1]]} · №${Number(match[2])}`
+}

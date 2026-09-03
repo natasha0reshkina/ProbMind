@@ -18,11 +18,8 @@ const studentItems: NavItem[] = [
 const teacherItems: NavItem[] = [
   ['/teacher/analytics', 'Сводка по группе'],
   ['/teacher/students', 'Студенты'],
-  ['/teacher/benchmarks', 'Сравнение результатов'],
-  ['/teacher/interventions', 'Коррекционная работа'],
+  ['/teacher/interventions', 'Повторная работа'],
   ['/teacher/questions/analytics', 'Статистика заданий'],
-  ['/teacher/psychometrics', 'Показатели качества'],
-  ['/teacher/research', 'Исследовательская статистика'],
   ['/teacher/content', 'Банк заданий'],
   ['/teacher/exports', 'Выгрузка данных'],
 ]
@@ -32,7 +29,7 @@ const adminItems: NavItem[] = [
   ['/admin/audit', 'Журнал изменений'],
   ['/admin/operations', 'Состояние системы'],
   ['/teacher/analytics', 'Сводка по группе'],
-  ['/teacher/students', 'Студенты'],
+  ['/teacher/students', 'Результаты студентов'],
   ['/teacher/content', 'Банк заданий'],
   ['/teacher/research', 'Статистика'],
   ['/teacher/exports', 'Выгрузка данных'],

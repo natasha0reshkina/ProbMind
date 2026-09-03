@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/client'
 import { ErrorView } from '../components/ErrorView'
 import { LoadingView } from '../components/LoadingView'
-import type { Dashboard } from '../types/api'
+import type { Dashboard, DiagnosticSession, PracticeSession } from '../types/api'
 
 function topicStatus(value: number) {
   if (value >= 0.8) return 'Освоено'
@@ -18,10 +18,23 @@ export function DashboardPage() {
     queryFn: async () => (await api.get<Dashboard>('/statistics/dashboard')).data,
   })
 
-  if (query.isLoading) return <LoadingView />
+  const diagnostics = useQuery({
+    queryKey: ['diagnostic-history'],
+    queryFn: async () => (await api.get<DiagnosticSession[]>('/diagnostics')).data,
+  })
+
+  const practiceHistory = useQuery({
+    queryKey: ['practice-history'],
+    queryFn: async () => (await api.get<PracticeSession[]>('/practice/history')).data,
+  })
+
+  if (query.isLoading || diagnostics.isLoading || practiceHistory.isLoading) return <LoadingView />
   if (!query.data) return <ErrorView />
 
   const data = query.data
+  const activeDiagnostic = (diagnostics.data ?? []).find((item) => item.status === 'InProgress')
+  const activePractice = (practiceHistory.data ?? []).find((item) => item.status === 'InProgress')
+  const hasObservations = data.topics.some((topic) => topic.observationCount > 0)
 
   return (
     <div className="academic-page">
@@ -30,13 +43,43 @@ export function DashboardPage() {
           <h1>Обзор</h1>
           <p>Текущие результаты по курсу и рекомендации для повторения.</p>
         </div>
-        <Link className="primary-button" to="/diagnostic">Начать диагностику</Link>
+        {activeDiagnostic ? (
+          <Link className="primary-button" to={`/diagnostics/${activeDiagnostic.id}/continue`}>Продолжить диагностику</Link>
+        ) : activePractice ? (
+          <Link className="primary-button" to={`/practice/${activePractice.id}/continue`}>Продолжить практику</Link>
+        ) : (
+          <Link className="primary-button" to="/diagnostic">Начать диагностику</Link>
+        )}
       </header>
+
+      {activeDiagnostic ? (
+        <section className="plain-section">
+          <div className="section-heading-row">
+            <div>
+              <h2>Незавершённая диагностика</h2>
+              <p>Ваш прогресс сохранён: отвечено {activeDiagnostic.answeredQuestionCount} из {activeDiagnostic.plannedQuestionCount} вопросов.</p>
+            </div>
+            <Link className="secondary-button" to={`/diagnostics/${activeDiagnostic.id}/continue`}>Допройти</Link>
+          </div>
+        </section>
+      ) : null}
+
+      {activePractice ? (
+        <section className="plain-section">
+          <div className="section-heading-row">
+            <div>
+              <h2>Незавершённая практика</h2>
+              <p>Ваш прогресс сохранён: выполнено {activePractice.completedExercises} из {activePractice.targetExercises} упражнений.</p>
+            </div>
+            <Link className="secondary-button" to={`/practice/${activePractice.id}/continue`}>Допройти</Link>
+          </div>
+        </section>
+      ) : null}
 
       <section className="plain-section">
         <h2>Краткая сводка</h2>
         <dl className="summary-list">
-          <div><dt>Общий уровень освоения</dt><dd>{Math.round(data.overallMastery * 100)}%</dd></div>
+          <div><dt>Общий уровень освоения</dt><dd>{hasObservations ? `${Math.round(data.overallMastery * 100)}%` : 'Нет данных'}</dd></div>
           <div><dt>Типичных ошибок требуют внимания</dt><dd>{data.activeMisconceptions}</dd></div>
           <div><dt>Исправлено типичных ошибок</dt><dd>{data.correctedMisconceptions}</dd></div>
           <div><dt>Завершено диагностик</dt><dd>{data.completedDiagnostics}</dd></div>
@@ -66,8 +109,8 @@ export function DashboardPage() {
                 <tr key={topic.topicId}>
                   <td><strong>{topic.name}</strong></td>
                   <td>{topic.observationCount}</td>
-                  <td className="numeric-cell">{Math.round(topic.mastery * 100)}%</td>
-                  <td><span className={`text-status text-status--${topicStatus(topic.mastery).replaceAll(' ', '-').toLowerCase()}`}>{topicStatus(topic.mastery)}</span></td>
+                  <td className="numeric-cell">{topic.observationCount > 0 ? `${Math.round(topic.mastery * 100)}%` : '—'}</td>
+                  <td>{topic.observationCount > 0 ? <span className={`text-status text-status--${topicStatus(topic.mastery).replaceAll(' ', '-').toLowerCase()}`}>{topicStatus(topic.mastery)}</span> : <span className="muted">Нет данных</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -84,6 +127,15 @@ export function DashboardPage() {
                 <div>
                   <strong>{item.title}</strong>
                   <p>{item.rationale}</p>
+                  <Link
+                    to={item.misconceptionId
+                      ? `/practice?misconception=${item.misconceptionId}`
+                      : item.topicId
+                        ? `/practice?topic=${item.topicId}`
+                        : '/diagnostic'}
+                  >
+                    Перейти к следующему шагу
+                  </Link>
                 </div>
                 <span>приоритет {Math.round(item.priority * 100)}%</span>
               </li>

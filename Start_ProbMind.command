@@ -48,10 +48,10 @@ echo "2/4 Собираю .NET Worker..."
 docker compose build worker || fail "не удалось собрать Worker"
 
 echo "3/4 Собираю React + TypeScript frontend..."
-docker compose build frontend || fail "не удалось собрать frontend"
+docker compose build --no-cache frontend || fail "не удалось собрать frontend"
 
 echo "4/4 Запускаю PostgreSQL, Redis, API, Worker и frontend..."
-docker compose up -d postgres redis api worker frontend || fail "не удалось запустить контейнеры"
+docker compose up -d --force-recreate postgres redis api worker frontend || fail "не удалось запустить контейнеры"
 
 printf "Ожидаю готовность API"
 api_ready=0

@@ -33,8 +33,8 @@ public sealed class LearningPathBuilder
             spacing * 0.10d;
 
         var reason = candidate.MisconceptionId is not null
-            ? $"{candidate.TopicName}: confidence in «{candidate.MisconceptionTitle}» is {misconception:P0}; mastery {candidate.Mastery:P0}."
-            : $"{candidate.TopicName}: topic mastery is {candidate.Mastery:P0}; spaced-review priority {spacing:P0}.";
+            ? $"{candidate.TopicName}: уверенность в наличии ошибки «{candidate.MisconceptionTitle}» — {misconception:P0}; освоение темы — {candidate.Mastery:P0}."
+            : $"{candidate.TopicName}: освоение темы — {candidate.Mastery:P0}; приоритет повторения с учётом давности — {spacing:P0}.";
 
         return new LearningPathPriority(
             candidate.TopicId,

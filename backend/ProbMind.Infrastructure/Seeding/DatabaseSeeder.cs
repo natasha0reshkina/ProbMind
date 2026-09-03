@@ -22,9 +22,13 @@ public sealed class DatabaseSeeder
     public async Task SeedAsync(CancellationToken ct = default)
     {
         await _db.Database.EnsureCreatedAsync(ct);
+        await EnsureCompatibilityIndexesAsync(ct);
 
         if (await _db.Set<Topic>().AnyAsync(ct))
+        {
+            await SeedExtendedQuestionBankAsync(ct);
             return;
+        }
 
         var topics = BuildTopics();
         var misconceptions = BuildMisconceptions(topics);
@@ -42,6 +46,7 @@ public sealed class DatabaseSeeder
             .Concat(PValueQuestionSeed.All)
             .Concat(LawLargeNumbersQuestionSeed.All)
             .Concat(RandomnessQuestionSeed.All)
+            .Concat(ExtendedQuestionSeed.All)
             .ToArray();
 
         foreach (var definition in definitions)
@@ -124,6 +129,99 @@ public sealed class DatabaseSeeder
         await _db.SaveChangesAsync(ct);
         await SeedDemoLearnerHistoryAsync(users.Single(x => x.Email == "student@probmind.local"), topics, misconceptions, ct);
         await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task SeedExtendedQuestionBankAsync(CancellationToken ct)
+    {
+        var topics = await _db.Set<Topic>().ToListAsync(ct);
+        var misconceptions = await _db.Set<Misconception>().ToListAsync(ct);
+        var existingCodes = (await _db.Set<Question>()
+            .Select(x => x.Code)
+            .ToListAsync(ct))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var topicByCode = topics.ToDictionary(x => x.Code);
+        var misconceptionByCode = misconceptions.ToDictionary(x => x.Code);
+        var added = false;
+
+        foreach (var definition in ExtendedQuestionSeed.All)
+        {
+            if (existingCodes.Contains(definition.Code))
+                continue;
+
+            var question = new Question
+            {
+                Id = StableGuid("question:" + definition.Code),
+                TopicId = topicByCode[definition.TopicCode].Id,
+                Code = definition.Code,
+                Kind = definition.Kind,
+                Status = ContentStatus.Published,
+                CurrentVersionNumber = 1,
+                PublishedAt = DateTimeOffset.UtcNow
+            };
+
+            var version = new QuestionVersion
+            {
+                Id = StableGuid("version:" + definition.Code + ":1"),
+                QuestionId = question.Id,
+                VersionNumber = 1,
+                Prompt = definition.Prompt,
+                CorrectExplanation = definition.CorrectExplanation,
+                Difficulty = definition.Difficulty,
+                IsTransferQuestion = definition.IsTransfer,
+                EstimatedSeconds = definition.IsTransfer ? 180 : definition.Difficulty == QuestionDifficulty.Advanced ? 150 : 90,
+                AuthorNotes = "Расширенная версия банка заданий."
+            };
+
+            await _db.Set<Question>().AddAsync(question, ct);
+            await _db.Set<QuestionVersion>().AddAsync(version, ct);
+
+            var optionIndex = 0;
+            foreach (var option in definition.Options)
+            {
+                optionIndex++;
+                await _db.Set<AnswerOption>().AddAsync(new AnswerOption
+                {
+                    Id = StableGuid($"option:{definition.Code}:{optionIndex}"),
+                    QuestionVersionId = version.Id,
+                    Text = option.Text,
+                    IsCorrect = option.IsCorrect,
+                    MisconceptionId = option.MisconceptionCode is null
+                        ? null
+                        : misconceptionByCode[option.MisconceptionCode].Id,
+                    Feedback = option.Feedback,
+                    SortOrder = optionIndex
+                }, ct);
+            }
+
+            foreach (var mcCode in definition.TestedMisconceptionCodes.Distinct())
+            {
+                await _db.Set<QuestionMisconceptionMap>().AddAsync(new QuestionMisconceptionMap
+                {
+                    Id = StableGuid($"map:{definition.Code}:{mcCode}"),
+                    QuestionId = question.Id,
+                    MisconceptionId = misconceptionByCode[mcCode].Id,
+                    RelevanceWeight = definition.IsTransfer ? 1.15d : definition.Difficulty == QuestionDifficulty.Advanced ? 1.08d : 1d,
+                    CanDisconfirm = true
+                }, ct);
+            }
+
+            existingCodes.Add(definition.Code);
+            added = true;
+        }
+
+        if (added)
+            await _db.SaveChangesAsync(ct);
+    }
+
+    private async Task EnsureCompatibilityIndexesAsync(CancellationToken ct)
+    {
+        await _db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_diagnostic_answers_SessionId_QuestionId\" ON diagnostic_answers (\"SessionId\", \"QuestionId\");",
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_practice_attempts_PracticeSessionId_QuestionId\" ON practice_attempts (\"PracticeSessionId\", \"QuestionId\");",
+            ct);
     }
 
     private List<User> BuildUsers()

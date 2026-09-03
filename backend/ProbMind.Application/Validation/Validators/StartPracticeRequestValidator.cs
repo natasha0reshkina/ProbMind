@@ -8,6 +8,7 @@ public sealed class StartPracticeRequestValidator : RequestValidator<StartPracti
     {
         var issues = new List<ValidationIssue>();
         if (request.TopicId == Guid.Empty) issues.Add(new("topicId", "required", "Topic id is required."));
+        if (request.MisconceptionId == Guid.Empty) issues.Add(new("misconceptionId", "invalid", "Misconception id cannot be empty."));
         Range(issues, "targetExercises", request.TargetExercises, 3, 12);
         return issues;
     }

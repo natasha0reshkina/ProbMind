@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.AspNetCore.Routing;
 using ProbMind.Api.Operations;
 
 namespace ProbMind.Api.Middleware;
@@ -20,9 +21,13 @@ public sealed class ApiMetricsMiddleware
         {
             stopwatch.Stop();
             var endpoint = context.GetEndpoint();
-            var route = endpoint?.DisplayName;
+            var route = endpoint is RouteEndpoint routeEndpoint
+                ? routeEndpoint.RoutePattern.RawText
+                : endpoint?.DisplayName;
+
             if (string.IsNullOrWhiteSpace(route))
                 route = context.Request.Path.Value ?? "/";
+
             registry.Record(
                 context.Request.Method,
                 route,

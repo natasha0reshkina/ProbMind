@@ -128,7 +128,9 @@ public sealed class PracticeService : IPracticeService
         if (question is null)
         {
             question = questions
-                .OrderBy(x => Guid.NewGuid())
+                .Where(x => !attemptedIds.Contains(x.Id))
+                .OrderBy(x => x.Kind == QuestionKind.Transfer ? 1 : 0)
+                .ThenBy(x => x.Code)
                 .FirstOrDefault();
         }
 
@@ -170,8 +172,19 @@ public sealed class PracticeService : IPracticeService
         if (session.Status != PracticeStatus.InProgress)
             throw new InvalidOperationException("Practice session is not in progress.");
 
+        var duplicate = await _uow.PracticeAttempts.AnyAsync(
+            x => x.PracticeSessionId == session.Id && x.QuestionId == request.QuestionId,
+            ct);
+
+        if (duplicate)
+            throw new InvalidOperationException("This question has already been answered in the practice session.");
+
         var question = await _uow.Questions.GetByIdAsync(request.QuestionId, ct)
             ?? throw new KeyNotFoundException("Question not found.");
+
+        if (question.Kind == QuestionKind.Diagnostic || question.Status != ContentStatus.Published)
+            throw new InvalidOperationException("Question is not available for practice use.");
+
         var version = await _uow.QuestionVersions.GetByIdAsync(request.QuestionVersionId, ct)
             ?? throw new KeyNotFoundException("Question version not found.");
         var option = await _uow.AnswerOptions.GetByIdAsync(request.AnswerOptionId, ct)
@@ -258,7 +271,7 @@ public sealed class PracticeService : IPracticeService
             x => x.PracticeSessionId == session.Id,
             ct);
 
-        if (attempts.Count < Math.Min(3, session.TargetExercises))
+        if (attempts.Count < session.TargetExercises)
             throw new InvalidOperationException("Not enough practice attempts to complete the session.");
 
         session.Status = PracticeStatus.Completed;

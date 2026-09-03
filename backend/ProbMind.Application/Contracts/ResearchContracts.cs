@@ -2,10 +2,13 @@ namespace ProbMind.Application.Contracts;
 
 public sealed record CooccurrenceEdgeDto(
     Guid MisconceptionAId,
-    string MisconceptionACode,
+    string MisconceptionATitle,
     Guid MisconceptionBId,
-    string MisconceptionBCode,
+    string MisconceptionBTitle,
     int Together,
+    int StudentsA,
+    int StudentsB,
+    int TotalStudents,
     double Jaccard,
     double Lift);
 
@@ -30,4 +33,4 @@ public sealed record PathStabilityDto(
 public sealed record ExportFileDto(
     string FileName,
     string ContentType,
-    string TextContent);
+    byte[] Content);

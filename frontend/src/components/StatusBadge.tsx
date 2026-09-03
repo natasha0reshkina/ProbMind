@@ -75,6 +75,14 @@ const labels: Record<string, string> = {
   developing: 'Развивается',
   moderately_stable: 'Умеренно стабильно',
   unstable: 'Нестабильно',
+  insufficient_history: 'Недостаточно истории',
+  adaptive: 'Адаптивно изменяется',
+  highly_dynamic: 'Часто изменяется',
+  systemic_misconceptions: 'Системные затруднения',
+  several_persistent_patterns: 'Несколько устойчивых ошибок',
+  targeted_support: 'Нужна точечная поддержка',
+  low_misconception_burden: 'Небольшое число устойчивых ошибок',
+  empty: 'Нет данных',
 }
 
 export function statusLabel(value: string) {

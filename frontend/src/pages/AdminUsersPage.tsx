@@ -104,10 +104,6 @@ export function AdminUsersPage() {
         <DataTable rows={rows} columns={columns} rowKey={(row) => row.id} searchText={(row) => `${row.displayName} ${row.email} ${row.role} ${row.isActive ? 'active' : 'inactive'}`} pageSize={16} />
       </section>
 
-      <section className="insight-grid">
-        <article className="insight-card"><Shield size={20} /><div><strong>Разделение прав</strong><p>Преподаватель работает с образовательной аналитикой и банком заданий, но не управляет ролями и состоянием системы.</p></div></article>
-        <article className="insight-card"><UserCog size={20} /><div><strong>Журналирование изменений</strong><p>Смена роли и активности проходит через серверный сервис и записывается в журнал действий.</p></div></article>
-      </section>
     </div>
   )
 }

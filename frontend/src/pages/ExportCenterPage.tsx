@@ -29,12 +29,12 @@ export function ExportCenterPage() {
       <PageHeader
         eyebrow="Экспорт данных"
         title="Экспорт данных"
-        description="Выгрузка результатов и статистики в CSV для анализа и подготовки отчётов. Раздел доступен преподавателю и администратору."
+        description="Выгрузка результатов и статистики в формате Excel для анализа и подготовки отчётов. Раздел доступен преподавателю и администратору."
       />
       <KpiStrip items={[
         { label: 'Доступных студентов', value: students.data?.length ?? 0 },
         { label: 'Тем контента', value: topics.data?.length ?? 0 },
-        { label: 'Формат', value: 'CSV', hint: 'UTF-8' },
+        { label: 'Формат', value: 'Excel', hint: '.xlsx' },
       ]} />
 
       <div className="export-grid">
@@ -47,14 +47,14 @@ export function ExportCenterPage() {
               {(students.data ?? []).map((student) => <option key={student.userId} value={student.userId}>{student.displayName} · {student.email}</option>)}
             </select>
           </label>
-          <button className="primary-button" disabled={!studentId} onClick={() => void download(`/exports/students/${studentId}`, `probmind-student-${studentId}.csv`)}><Download size={16} /> Скачать CSV</button>
+          <button className="primary-button" disabled={!studentId} onClick={() => void download(`/exports/students/${studentId}`, `rezultaty-studenta-${studentId}.xlsx`)}><Download size={16} /> Скачать таблицу</button>
         </article>
 
         <article className="export-card">
           <div className="export-card__icon"><Database size={22} /></div>
           <div><h2>Заблуждения по группе</h2><p>Агрегированная распространённость и уровень уверенности по типичным заблуждениям всей группы.</p></div>
           <div className="export-spacer" />
-          <button className="primary-button" onClick={() => void download('/exports/cohort/misconceptions', 'probmind-cohort-misconceptions.csv')}><Download size={16} /> Скачать CSV по группе</button>
+          <button className="primary-button" onClick={() => void download('/exports/cohort/misconceptions', 'tipichnye-oshibki-gruppy.xlsx')}><Download size={16} /> Скачать таблицу по группе</button>
         </article>
 
         <article className="export-card">
@@ -66,7 +66,7 @@ export function ExportCenterPage() {
               {(topics.data ?? []).map((topic) => <option key={topic.id} value={topic.id}>{topic.nameRu}</option>)}
             </select>
           </label>
-          <button className="primary-button" onClick={() => void download(`/exports/questions${topicId ? `?topicId=${topicId}` : ''}`, 'probmind-question-analytics.csv')}><Download size={16} /> Скачать CSV</button>
+          <button className="primary-button" onClick={() => void download(`/exports/questions${topicId ? `?topicId=${topicId}` : ''}`, 'statistika-zadaniy.xlsx')}><Download size={16} /> Скачать таблицу</button>
         </article>
       </div>
 
@@ -75,7 +75,7 @@ export function ExportCenterPage() {
         <ul className="feature-list">
           <li>Выгрузки формируются на сервере из текущего состояния базы данных.</li>
           <li>Доступ к выгрузкам ограничен ролями: студент не может получить данные группы или чужой персональный профиль.</li>
-          <li>CSV можно использовать для дополнительного анализа в Python, R или Excel.</li>
+          <li>Выгруженный файл можно открыть в табличном редакторе или использовать для дополнительного анализа.</li>
         </ul>
       </section>
     </div>

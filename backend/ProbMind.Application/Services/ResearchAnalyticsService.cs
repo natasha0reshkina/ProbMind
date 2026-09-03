@@ -50,14 +50,29 @@ public sealed class ResearchAnalyticsService : IResearchAnalyticsService
 
         return _cooccurrence.Analyze(sets)
             .Where(x => catalog.ContainsKey(x.A) && catalog.ContainsKey(x.B))
+            .Select(x =>
+            {
+                var studentsA = sets.Count(s => s.ActiveMisconceptions.Contains(x.A));
+                var studentsB = sets.Count(s => s.ActiveMisconceptions.Contains(x.B));
+                return new
+                {
+                    Edge = x,
+                    StudentsA = studentsA,
+                    StudentsB = studentsB
+                };
+            })
+            .Where(x => x.Edge.Together >= 2 && x.StudentsA >= 2 && x.StudentsB >= 2)
             .Select(x => new CooccurrenceEdgeDto(
-                x.A,
-                catalog[x.A].Code,
-                x.B,
-                catalog[x.B].Code,
-                x.Together,
-                x.Jaccard,
-                x.Lift))
+                x.Edge.A,
+                catalog[x.Edge.A].Title,
+                x.Edge.B,
+                catalog[x.Edge.B].Title,
+                x.Edge.Together,
+                x.StudentsA,
+                x.StudentsB,
+                sets.Length,
+                x.Edge.Jaccard,
+                x.Edge.Lift))
             .ToArray();
     }
 

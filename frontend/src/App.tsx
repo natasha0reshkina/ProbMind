@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from './auth/ProtectedRoute'
+import { ApiErrorNotice } from './components/ApiErrorNotice'
 import { useAuth } from './auth/AuthContext'
 import { AppShell } from './layout/AppShell'
 import { AdminUsersPage } from './pages/AdminUsersPage'
@@ -39,7 +40,9 @@ function HomeRedirect() {
 
 export function App() {
   return (
-    <Routes>
+    <>
+      <ApiErrorNotice />
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
 
@@ -50,11 +53,13 @@ export function App() {
 
         <Route path="/diagnostic" element={<ProtectedRoute roles={['Student']}><DiagnosticPage /></ProtectedRoute>} />
         <Route path="/diagnostics/history" element={<ProtectedRoute roles={['Student']}><DiagnosticHistoryPage /></ProtectedRoute>} />
+        <Route path="/diagnostics/:sessionId/continue" element={<ProtectedRoute roles={['Student']}><DiagnosticPage /></ProtectedRoute>} />
         <Route path="/diagnostics/:sessionId/report" element={<ProtectedRoute roles={['Student']}><DiagnosticReportPage /></ProtectedRoute>} />
         <Route path="/misconceptions" element={<ProtectedRoute roles={['Student']}><MisconceptionsPage /></ProtectedRoute>} />
         <Route path="/misconceptions/:misconceptionId" element={<ProtectedRoute roles={['Student']}><MisconceptionDetailPage /></ProtectedRoute>} />
         <Route path="/learning-path" element={<ProtectedRoute roles={['Student']}><LearningPathPage /></ProtectedRoute>} />
         <Route path="/practice" element={<ProtectedRoute roles={['Student']}><PracticePage /></ProtectedRoute>} />
+        <Route path="/practice/:sessionId/continue" element={<ProtectedRoute roles={['Student']}><PracticePage /></ProtectedRoute>} />
         <Route path="/statistics" element={<ProtectedRoute roles={['Student']}><StatisticsPage /></ProtectedRoute>} />
 
         <Route path="/teacher/analytics" element={<ProtectedRoute roles={['Teacher', 'Admin']}><TeacherAnalyticsPage /></ProtectedRoute>} />
@@ -74,7 +79,8 @@ export function App() {
         <Route path="/admin/operations" element={<ProtectedRoute roles={['Admin']}><OperationsPage /></ProtectedRoute>} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }

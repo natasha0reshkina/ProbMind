@@ -1,4 +1,5 @@
 using ProbMind.Application.Contracts;
+using ProbMind.Domain.Enums;
 
 namespace ProbMind.Application.Validation;
 
@@ -12,21 +13,39 @@ public sealed class CreateQuestionRequestValidator : RequestValidator<CreateQues
         Required(issues, "prompt", request.Prompt, 8000);
         Required(issues, "correctExplanation", request.CorrectExplanation, 12000);
 
-        if (request.Options.Count is < 2 or > 8)
-            issues.Add(new("options", "count", "Question must have between 2 and 8 answer options."));
+        if (!Enum.IsDefined(request.Kind))
+            issues.Add(new("kind", "enum", "Unknown question kind."));
+        if (!Enum.IsDefined(request.Difficulty))
+            issues.Add(new("difficulty", "enum", "Unknown question difficulty."));
 
-        if (request.Options.Count(x => x.IsCorrect) != 1)
-            issues.Add(new("options", "correct_count", "Exactly one option must be correct."));
-
-        foreach (var option in request.Options)
+        if (request.Options is null)
         {
-            if (string.IsNullOrWhiteSpace(option.Text))
-                issues.Add(new("options.text", "required", "Every answer option must contain text."));
-            if (!option.IsCorrect && option.MisconceptionId is null && request.Kind.ToString() == "Diagnostic")
-                issues.Add(new("options.misconceptionId", "diagnostic_mapping", "Diagnostic distractors should map to a misconception."));
+            issues.Add(new("options", "required", "Question options are required."));
+        }
+        else
+        {
+            if (request.Options.Count is < 2 or > 8)
+                issues.Add(new("options", "count", "Question must have between 2 and 8 answer options."));
+
+            if (request.Options.Count(x => x.IsCorrect) != 1)
+                issues.Add(new("options", "correct_count", "Exactly one option must be correct."));
+
+            foreach (var option in request.Options)
+            {
+                if (option is null)
+                {
+                    issues.Add(new("options", "required", "Answer option cannot be null."));
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(option.Text))
+                    issues.Add(new("options.text", "required", "Every answer option must contain text."));
+                if (request.Kind == QuestionKind.Diagnostic && !option.IsCorrect && option.MisconceptionId is null)
+                    issues.Add(new("options.misconceptionId", "diagnostic_mapping", "Diagnostic distractors should map to a misconception."));
+            }
         }
 
-        if (request.TestedMisconceptionIds.Count == 0 && request.Kind.ToString() == "Diagnostic")
+        if (request.Kind == QuestionKind.Diagnostic && (request.TestedMisconceptionIds is null || request.TestedMisconceptionIds.Count == 0))
             issues.Add(new("testedMisconceptionIds", "coverage", "Diagnostic question must test at least one misconception."));
 
         return issues;

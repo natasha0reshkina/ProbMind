@@ -304,7 +304,7 @@ public sealed class AdvancedAnalyticsService : IAdvancedAnalyticsService
         var sessions = await _uow.DiagnosticSessions.ListAsync(ct);
         var risks = await RiskRosterAsync(ct);
         var drift = await ContentDriftAsync(ct);
-        var completed = sessions.Where(x => x.Status == DiagnosticStatus.Completed && x.OverallScore.HasValue).ToArray();
+        var completed = sessions.Where(x => x.Status == DiagnosticStatus.ReportReady && x.OverallScore.HasValue).ToArray();
 
         return new AdvancedSystemOverviewDto(
             students.Length,

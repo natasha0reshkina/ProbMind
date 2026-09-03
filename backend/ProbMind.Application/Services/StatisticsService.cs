@@ -36,7 +36,8 @@ public sealed class StatisticsService : IStatisticsService
         var practice = await _uow.PracticeSessions.WhereAsync(x => x.UserId == userId, ct);
         var recommendations = await _recommendations.ListAsync(userId, includeDismissed: false, ct);
 
-        var overall = topics.Count == 0 ? 0.5d : topics.Average(x => x.Mastery);
+        var observedTopics = topics.Where(x => x.ObservationCount > 0).ToArray();
+        var overall = observedTopics.Length == 0 ? 0d : observedTopics.Average(x => x.Mastery);
         var active = misconceptions.Count(x =>
             x.Status is MisconceptionStatus.Suspected
                 or MisconceptionStatus.Detected
@@ -103,7 +104,7 @@ public sealed class StatisticsService : IStatisticsService
 
     public async Task<CohortAnalyticsDto> CohortAsync(CancellationToken ct = default)
     {
-        const string key = "analytics:cohort:v2";
+        const string key = "analytics:cohort:v3";
         var cached = await _cache.GetAsync<CohortAnalyticsDto>(key, ct);
         if (cached is not null)
             return cached;
@@ -114,7 +115,8 @@ public sealed class StatisticsService : IStatisticsService
         var topicStates = await _uow.TopicMasteries.ListAsync(ct);
         var topics = await _uow.Topics.ListAsync(ct);
 
-        var prevalence = await BuildPrevalenceAsync(users.Count, ct);
+        var studentsWithResults = users.Count(user => answers.Any(answer => answer.UserId == user.Id));
+        var prevalence = await BuildPrevalenceAsync(studentsWithResults, ct);
         var meanTopic = topics
             .OrderBy(x => x.SortOrder)
             .Select(topic =>
@@ -149,10 +151,12 @@ public sealed class StatisticsService : IStatisticsService
     public async Task<IReadOnlyList<MisconceptionPrevalenceDto>> PrevalenceAsync(
         CancellationToken ct = default)
     {
-        var students = await _uow.Users.CountAsync(
+        var students = await _uow.Users.WhereAsync(
             x => x.Role == UserRole.Student && x.IsActive,
             ct);
-        return await BuildPrevalenceAsync(students, ct);
+        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var studentsWithResults = students.Count(user => answers.Any(answer => answer.UserId == user.Id));
+        return await BuildPrevalenceAsync(studentsWithResults, ct);
     }
 
     public async Task<SystemMetricsDto> SystemMetricsAsync(CancellationToken ct = default)
