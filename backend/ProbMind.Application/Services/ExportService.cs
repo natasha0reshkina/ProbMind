@@ -23,7 +23,7 @@ public sealed class ExportService : IExportService
         _statistics = statistics;
     }
 
-    public async Task<ExportFileDto> StudentProfileCsvAsync(
+    public async Task<ExportFileDto> StudentProfileXlsxAsync(
         Guid studentId,
         CancellationToken ct = default)
     {
@@ -61,7 +61,7 @@ public sealed class ExportService : IExportService
                 rows));
     }
 
-    public async Task<ExportFileDto> CohortMisconceptionsCsvAsync(CancellationToken ct = default)
+    public async Task<ExportFileDto> CohortMisconceptionsXlsxAsync(CancellationToken ct = default)
     {
         var items = await _statistics.PrevalenceAsync(ct);
         var rows = items.Select(item => (IReadOnlyList<string>)new[]
@@ -91,7 +91,7 @@ public sealed class ExportService : IExportService
                 rows));
     }
 
-    public async Task<ExportFileDto> QuestionAnalyticsCsvAsync(
+    public async Task<ExportFileDto> QuestionAnalyticsXlsxAsync(
         Guid? topicId,
         CancellationToken ct = default)
     {

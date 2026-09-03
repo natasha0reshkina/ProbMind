@@ -4,7 +4,7 @@ namespace ProbMind.Application.Services;
 
 public interface IExportService
 {
-    Task<ExportFileDto> StudentProfileCsvAsync(Guid studentId, CancellationToken ct = default);
-    Task<ExportFileDto> CohortMisconceptionsCsvAsync(CancellationToken ct = default);
-    Task<ExportFileDto> QuestionAnalyticsCsvAsync(Guid? topicId, CancellationToken ct = default);
+    Task<ExportFileDto> StudentProfileXlsxAsync(Guid studentId, CancellationToken ct = default);
+    Task<ExportFileDto> CohortMisconceptionsXlsxAsync(CancellationToken ct = default);
+    Task<ExportFileDto> QuestionAnalyticsXlsxAsync(Guid? topicId, CancellationToken ct = default);
 }

@@ -16,21 +16,21 @@ public sealed class ExportsController : ControllerBase
     [HttpGet("students/{studentId:guid}")]
     public async Task<IActionResult> Student(Guid studentId, CancellationToken ct)
     {
-        var file = await _exports.StudentProfileCsvAsync(studentId, ct);
+        var file = await _exports.StudentProfileXlsxAsync(studentId, ct);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
     [HttpGet("cohort/misconceptions")]
     public async Task<IActionResult> Cohort(CancellationToken ct)
     {
-        var file = await _exports.CohortMisconceptionsCsvAsync(ct);
+        var file = await _exports.CohortMisconceptionsXlsxAsync(ct);
         return File(file.Content, file.ContentType, file.FileName);
     }
 
     [HttpGet("questions")]
     public async Task<IActionResult> Questions([FromQuery] Guid? topicId, CancellationToken ct)
     {
-        var file = await _exports.QuestionAnalyticsCsvAsync(topicId, ct);
+        var file = await _exports.QuestionAnalyticsXlsxAsync(topicId, ct);
         return File(file.Content, file.ContentType, file.FileName);
     }
 }
