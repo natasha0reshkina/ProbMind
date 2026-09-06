@@ -37,7 +37,7 @@ public sealed class TeacherService : ITeacherService
     public async Task<IReadOnlyList<StudentListItemDto>> ListStudentsAsync(CancellationToken ct = default)
     {
         var students = await _uow.Users.WhereAsync(
-            x => x.Role == UserRole.Student && x.IsActive,
+            x => x.Role == UserRole.Student && x.IsActive && !x.Email.EndsWith("@probmind.test"),
             ct);
         var masteries = await _uow.TopicMasteries.ListAsync(ct);
         var misconceptions = await _uow.UserMisconceptions.ListAsync(ct);
@@ -189,6 +189,62 @@ public sealed class TeacherService : ITeacherService
         return result;
     }
 
+    public async Task<IReadOnlyList<StudentAnswerNoteDto>> StudentAnswerNotesAsync(
+        Guid studentId,
+        int limit = 100,
+        CancellationToken ct = default)
+    {
+        var student = await _uow.Users.GetByIdAsync(studentId, ct)
+            ?? throw new KeyNotFoundException("Студент не найден.");
+        if (student.Role != UserRole.Student)
+            throw new InvalidOperationException("Указанная учётная запись не принадлежит студенту.");
+
+        var diagnostic = (await _uow.DiagnosticAnswers.WhereAsync(
+                x => x.UserId == studentId && x.StudentNote != null && x.StudentNote != string.Empty,
+                ct))
+            .Select(x => (x.Id, x.SubmittedAt, x.QuestionId, x.QuestionVersionId, Note: x.StudentNote!, x.IsCorrect, Source: "Диагностика"));
+        var practice = (await _uow.PracticeAttempts.WhereAsync(
+                x => x.UserId == studentId && x.StudentNote != null && x.StudentNote != string.Empty,
+                ct))
+            .Select(x => (x.Id, x.SubmittedAt, x.QuestionId, x.QuestionVersionId, Note: x.StudentNote!, x.IsCorrect, Source: "Практика"));
+
+        var notes = diagnostic
+            .Concat(practice)
+            .OrderByDescending(x => x.SubmittedAt)
+            .Take(Math.Clamp(limit, 1, 300))
+            .ToArray();
+
+        if (notes.Length == 0)
+            return Array.Empty<StudentAnswerNoteDto>();
+
+        var questions = (await _uow.Questions.ListAsync(ct)).ToDictionary(x => x.Id);
+        var versions = (await _uow.QuestionVersions.ListAsync(ct)).ToDictionary(x => x.Id);
+        var topics = (await _uow.Topics.ListAsync(ct)).ToDictionary(x => x.Id);
+        var result = new List<StudentAnswerNoteDto>();
+
+        foreach (var note in notes)
+        {
+            if (!questions.TryGetValue(note.QuestionId, out var question) ||
+                !versions.TryGetValue(note.QuestionVersionId, out var version))
+                continue;
+
+            var topicName = topics.TryGetValue(question.TopicId, out var topic)
+                ? topic.NameRu
+                : "Тема не найдена";
+
+            result.Add(new StudentAnswerNoteDto(
+                note.Id,
+                note.SubmittedAt,
+                note.Source,
+                topicName,
+                version.Prompt,
+                note.Note,
+                note.IsCorrect));
+        }
+
+        return result;
+    }
+
     public async Task<IReadOnlyList<QuestionAnalyticsDto>> QuestionAnalyticsAsync(
         Guid? topicId,
         CancellationToken ct = default)
@@ -198,6 +254,8 @@ public sealed class TeacherService : ITeacherService
         var attempts = await _uow.PracticeAttempts.ListAsync(ct);
         var options = await _uow.AnswerOptions.ListAsync(ct);
         var masteries = await _uow.TopicMasteries.ListAsync(ct);
+        var versions = await _uow.QuestionVersions.ListAsync(ct);
+        var topics = (await _uow.Topics.ListAsync(ct)).ToDictionary(x => x.Id);
 
         var result = new List<QuestionAnalyticsDto>();
 
@@ -211,9 +269,13 @@ public sealed class TeacherService : ITeacherService
 
             if (responseCount == 0)
             {
+                var emptyVersion = versions.FirstOrDefault(x =>
+                    x.QuestionId == question.Id && x.VersionNumber == question.CurrentVersionNumber);
                 result.Add(new QuestionAnalyticsDto(
                     question.Id,
                     question.Code,
+                    topics.TryGetValue(question.TopicId, out var emptyTopic) ? emptyTopic.NameRu : "Без темы",
+                    emptyVersion?.Prompt ?? question.Code,
                     0,
                     0d,
                     .5d,
@@ -261,11 +323,15 @@ public sealed class TeacherService : ITeacherService
             var median = Median(times);
             var correctCount = diagnostic.Count(x => x.IsCorrect) + practice.Count(x => x.IsCorrect);
 
+            var currentVersion = versions.FirstOrDefault(x =>
+                x.QuestionId == question.Id && x.VersionNumber == question.CurrentVersionNumber);
             result.Add(new QuestionAnalyticsDto(
                 question.Id,
                 question.Code,
+                topics.TryGetValue(question.TopicId, out var topic) ? topic.NameRu : "Без темы",
+                currentVersion?.Prompt ?? question.Code,
                 responseCount,
-                correctCount / (double)responseCount,
+                Math.Clamp(correctCount / (double)responseCount, 0d, 1d),
                 item.Difficulty,
                 item.Discrimination,
                 item.QualityBand,
@@ -381,7 +447,7 @@ public sealed class TeacherService : ITeacherService
 
     public async Task<IReadOnlyList<CohortSegmentDto>> SegmentsAsync(CancellationToken ct = default)
     {
-        var students = await _uow.Users.WhereAsync(x => x.Role == UserRole.Student && x.IsActive, ct);
+        var students = await _uow.Users.WhereAsync(x => x.Role == UserRole.Student && x.IsActive && !x.Email.EndsWith("@probmind.test"), ct);
         var mastery = await _uow.TopicMasteries.ListAsync(ct);
         var misconceptions = await _uow.UserMisconceptions.ListAsync(ct);
         var events = await _uow.ActivityEvents.ListAsync(ct);

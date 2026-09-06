@@ -9,7 +9,10 @@ public sealed record SubmitPracticeAnswerRequest(
     Guid QuestionVersionId,
     Guid AnswerOptionId,
     ExerciseType ExerciseType,
-    int ResponseTimeMs);
+    int ResponseTimeMs,
+    string? StudentNote = null,
+    int? ConfidenceLevel = null,
+    string? Reasoning = null);
 
 public sealed record PracticeSessionDto(
     Guid Id,

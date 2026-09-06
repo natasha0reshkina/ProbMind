@@ -47,6 +47,7 @@ public sealed class DatabaseSeeder
             .Concat(LawLargeNumbersQuestionSeed.All)
             .Concat(RandomnessQuestionSeed.All)
             .Concat(ExtendedQuestionSeed.All)
+            .Concat(LargeQuestionBankSeed.All)
             .ToArray();
 
         foreach (var definition in definitions)
@@ -135,19 +136,32 @@ public sealed class DatabaseSeeder
     {
         var topics = await _db.Set<Topic>().ToListAsync(ct);
         var misconceptions = await _db.Set<Misconception>().ToListAsync(ct);
-        var existingCodes = (await _db.Set<Question>()
-            .Select(x => x.Code)
-            .ToListAsync(ct))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var existingQuestions = (await _db.Set<Question>().ToListAsync(ct))
+            .ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
+        var existingVersions = await _db.Set<QuestionVersion>().ToListAsync(ct);
 
         var topicByCode = topics.ToDictionary(x => x.Code);
         var misconceptionByCode = misconceptions.ToDictionary(x => x.Code);
-        var added = false;
+        var changed = false;
 
-        foreach (var definition in ExtendedQuestionSeed.All)
+        foreach (var definition in ExtendedQuestionSeed.All.Concat(LargeQuestionBankSeed.All))
         {
-            if (existingCodes.Contains(definition.Code))
+            if (existingQuestions.TryGetValue(definition.Code, out var existingQuestion))
+            {
+                var currentVersion = existingVersions.SingleOrDefault(x =>
+                    x.QuestionId == existingQuestion.Id &&
+                    x.VersionNumber == existingQuestion.CurrentVersionNumber);
+                if (currentVersion is not null)
+                {
+                    currentVersion.Difficulty = definition.Difficulty;
+                    currentVersion.IsTransferQuestion = definition.IsTransfer;
+                    currentVersion.EstimatedSeconds = definition.IsTransfer
+                        ? 180
+                        : definition.Difficulty == QuestionDifficulty.Advanced ? 150 : 90;
+                }
+                changed = true;
                 continue;
+            }
 
             var question = new Question
             {
@@ -206,11 +220,11 @@ public sealed class DatabaseSeeder
                 }, ct);
             }
 
-            existingCodes.Add(definition.Code);
-            added = true;
+            existingQuestions[definition.Code] = question;
+            changed = true;
         }
 
-        if (added)
+        if (changed)
             await _db.SaveChangesAsync(ct);
     }
 
@@ -222,6 +236,236 @@ public sealed class DatabaseSeeder
         await _db.Database.ExecuteSqlRawAsync(
             "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_practice_attempts_PracticeSessionId_QuestionId\" ON practice_attempts (\"PracticeSessionId\", \"QuestionId\");",
             ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE diagnostic_answers ADD COLUMN IF NOT EXISTS \"StudentNote\" character varying(2000) NULL;",
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE practice_attempts ADD COLUMN IF NOT EXISTS \"StudentNote\" character varying(2000) NULL;",
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS \"LeaderboardOptIn\" boolean NOT NULL DEFAULT FALSE;",
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            "CREATE INDEX IF NOT EXISTS \"IX_users_LeaderboardOptIn\" ON users (\"LeaderboardOptIn\");",
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS gamification_settings (
+                "Id" uuid NOT NULL,
+                "LeaderboardEnabled" boolean NOT NULL DEFAULT TRUE,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NOT NULL,
+                "Version" bigint NOT NULL,
+                CONSTRAINT "PK_gamification_settings" PRIMARY KEY ("Id")
+            );
+            """,
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS study_items (
+                "Id" uuid NOT NULL,
+                "CreatedByUserId" uuid NOT NULL,
+                "StudentId" uuid NULL,
+                "Kind" integer NOT NULL,
+                "Visibility" integer NOT NULL,
+                "Title" character varying(300) NOT NULL,
+                "Body" character varying(10000) NOT NULL,
+                "TeacherResponse" character varying(5000) NOT NULL DEFAULT '',
+                "DiscussInClass" boolean NOT NULL DEFAULT FALSE,
+                "TeacherRespondedAt" timestamp with time zone NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NOT NULL,
+                "Version" bigint NOT NULL,
+                CONSTRAINT "PK_study_items" PRIMARY KEY ("Id")
+            );
+            CREATE INDEX IF NOT EXISTS "IX_study_items_StudentId" ON study_items ("StudentId");
+            CREATE INDEX IF NOT EXISTS "IX_study_items_CreatedByUserId" ON study_items ("CreatedByUserId");
+            CREATE INDEX IF NOT EXISTS "IX_study_items_Visibility" ON study_items ("Visibility");
+            CREATE INDEX IF NOT EXISTS "IX_study_items_CreatedAt" ON study_items ("CreatedAt");
+            """,
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS study_item_notes (
+                "Id" uuid NOT NULL,
+                "StudyItemId" uuid NOT NULL,
+                "StudentId" uuid NOT NULL,
+                "Body" character varying(5000) NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NOT NULL,
+                "Version" bigint NOT NULL,
+                CONSTRAINT "PK_study_item_notes" PRIMARY KEY ("Id")
+            );
+            CREATE INDEX IF NOT EXISTS "IX_study_item_notes_StudyItemId" ON study_item_notes ("StudyItemId");
+            CREATE INDEX IF NOT EXISTS "IX_study_item_notes_StudentId" ON study_item_notes ("StudentId");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_study_item_notes_StudyItemId_StudentId" ON study_item_notes ("StudyItemId", "StudentId");
+            """,
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """ALTER TABLE diagnostic_sessions ADD COLUMN IF NOT EXISTS "DiagnosticTemplateId" uuid NULL;""",
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """CREATE INDEX IF NOT EXISTS "IX_diagnostic_sessions_DiagnosticTemplateId" ON diagnostic_sessions ("DiagnosticTemplateId");""",
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS diagnostic_templates (
+                "Id" uuid NOT NULL,
+                "CreatedByUserId" uuid NOT NULL,
+                "GroupId" uuid NULL,
+                "StudentId" uuid NULL,
+                "Title" character varying(300) NOT NULL,
+                "Description" character varying(2000) NOT NULL DEFAULT '',
+                "IsPublished" boolean NOT NULL DEFAULT FALSE,
+                "PublishedAt" timestamp with time zone NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NOT NULL,
+                "Version" bigint NOT NULL,
+                CONSTRAINT "PK_diagnostic_templates" PRIMARY KEY ("Id")
+            );
+            """,
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            ALTER TABLE diagnostic_templates ADD COLUMN IF NOT EXISTS "GroupId" uuid NULL;
+            ALTER TABLE diagnostic_templates ADD COLUMN IF NOT EXISTS "StudentId" uuid NULL;
+            CREATE INDEX IF NOT EXISTS "IX_diagnostic_templates_CreatedByUserId" ON diagnostic_templates ("CreatedByUserId");
+            CREATE INDEX IF NOT EXISTS "IX_diagnostic_templates_GroupId" ON diagnostic_templates ("GroupId");
+            CREATE INDEX IF NOT EXISTS "IX_diagnostic_templates_StudentId" ON diagnostic_templates ("StudentId");
+            CREATE INDEX IF NOT EXISTS "IX_diagnostic_templates_IsPublished" ON diagnostic_templates ("IsPublished");
+            CREATE INDEX IF NOT EXISTS "IX_diagnostic_templates_CreatedAt" ON diagnostic_templates ("CreatedAt");
+            """,
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS diagnostic_template_questions (
+                "Id" uuid NOT NULL,
+                "DiagnosticTemplateId" uuid NOT NULL,
+                "QuestionId" uuid NOT NULL,
+                "Position" integer NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NOT NULL,
+                "Version" bigint NOT NULL,
+                CONSTRAINT "PK_diagnostic_template_questions" PRIMARY KEY ("Id")
+            );
+            CREATE INDEX IF NOT EXISTS "IX_diagnostic_template_questions_DiagnosticTemplateId" ON diagnostic_template_questions ("DiagnosticTemplateId");
+            CREATE INDEX IF NOT EXISTS "IX_diagnostic_template_questions_QuestionId" ON diagnostic_template_questions ("QuestionId");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_diagnostic_template_questions_DiagnosticTemplateId_Position" ON diagnostic_template_questions ("DiagnosticTemplateId", "Position");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_diagnostic_template_questions_DiagnosticTemplateId_QuestionId" ON diagnostic_template_questions ("DiagnosticTemplateId", "QuestionId");
+            """,
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            ALTER TABLE diagnostic_answers ADD COLUMN IF NOT EXISTS "ConfidenceLevel" integer NULL;
+            ALTER TABLE diagnostic_answers ADD COLUMN IF NOT EXISTS "Reasoning" character varying(4000) NULL;
+            ALTER TABLE practice_attempts ADD COLUMN IF NOT EXISTS "ConfidenceLevel" integer NULL;
+            ALTER TABLE practice_attempts ADD COLUMN IF NOT EXISTS "Reasoning" character varying(4000) NULL;
+            """,
+            ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS spaced_review_items (
+                "Id" uuid NOT NULL, "UserId" uuid NOT NULL, "TopicId" uuid NOT NULL,
+                "NextReviewAt" timestamp with time zone NOT NULL, "LastReviewedAt" timestamp with time zone NULL,
+                "IntervalDays" integer NOT NULL, "EaseFactor" double precision NOT NULL, "Repetitions" integer NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL, "UpdatedAt" timestamp with time zone NOT NULL, "Version" bigint NOT NULL,
+                CONSTRAINT "PK_spaced_review_items" PRIMARY KEY ("Id")
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_spaced_review_items_UserId_TopicId" ON spaced_review_items ("UserId", "TopicId");
+            CREATE INDEX IF NOT EXISTS "IX_spaced_review_items_NextReviewAt" ON spaced_review_items ("NextReviewAt");
+            """, ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS student_groups (
+                "Id" uuid NOT NULL, "CreatedByUserId" uuid NOT NULL, "Name" character varying(200) NOT NULL,
+                "Description" character varying(2000) NOT NULL DEFAULT '', "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NOT NULL, "Version" bigint NOT NULL,
+                CONSTRAINT "PK_student_groups" PRIMARY KEY ("Id")
+            );
+            CREATE INDEX IF NOT EXISTS "IX_student_groups_CreatedByUserId" ON student_groups ("CreatedByUserId");
+            CREATE TABLE IF NOT EXISTS student_group_members (
+                "Id" uuid NOT NULL, "GroupId" uuid NOT NULL, "StudentId" uuid NOT NULL,
+                "CreatedAt" timestamp with time zone NOT NULL, "UpdatedAt" timestamp with time zone NOT NULL, "Version" bigint NOT NULL,
+                CONSTRAINT "PK_student_group_members" PRIMARY KEY ("Id")
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_student_group_members_GroupId_StudentId" ON student_group_members ("GroupId", "StudentId");
+            CREATE INDEX IF NOT EXISTS "IX_student_group_members_StudentId" ON student_group_members ("StudentId");
+            """, ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS teacher_interventions (
+                "Id" uuid NOT NULL, "CreatedByUserId" uuid NOT NULL, "StudentId" uuid NOT NULL,
+                "Title" character varying(300) NOT NULL, "Body" character varying(5000) NOT NULL DEFAULT '',
+                "Kind" character varying(80) NOT NULL DEFAULT 'Practice', "IsCompleted" boolean NOT NULL DEFAULT FALSE,
+                "DueAt" timestamp with time zone NULL, "CompletedAt" timestamp with time zone NULL,
+                "CreatedAt" timestamp with time zone NOT NULL, "UpdatedAt" timestamp with time zone NOT NULL, "Version" bigint NOT NULL,
+                CONSTRAINT "PK_teacher_interventions" PRIMARY KEY ("Id")
+            );
+            CREATE INDEX IF NOT EXISTS "IX_teacher_interventions_StudentId" ON teacher_interventions ("StudentId");
+            CREATE INDEX IF NOT EXISTS "IX_teacher_interventions_CreatedByUserId" ON teacher_interventions ("CreatedByUserId");
+            CREATE INDEX IF NOT EXISTS "IX_teacher_interventions_IsCompleted" ON teacher_interventions ("IsCompleted");
+            """, ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS exam_definitions (
+                "Id" uuid NOT NULL, "CreatedByUserId" uuid NOT NULL, "DiagnosticTemplateId" uuid NOT NULL, "GroupId" uuid NULL, "StudentId" uuid NULL,
+                "Title" character varying(300) NOT NULL, "Description" character varying(2000) NOT NULL DEFAULT '',
+                "TimeLimitMinutes" integer NOT NULL, "IsPublished" boolean NOT NULL DEFAULT FALSE,
+                "AvailableFrom" timestamp with time zone NULL, "AvailableUntil" timestamp with time zone NULL,
+                "CreatedAt" timestamp with time zone NOT NULL, "UpdatedAt" timestamp with time zone NOT NULL, "Version" bigint NOT NULL,
+                CONSTRAINT "PK_exam_definitions" PRIMARY KEY ("Id")
+            );
+            """, ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            ALTER TABLE exam_definitions ADD COLUMN IF NOT EXISTS "GroupId" uuid NULL;
+            ALTER TABLE exam_definitions ADD COLUMN IF NOT EXISTS "StudentId" uuid NULL;
+            CREATE INDEX IF NOT EXISTS "IX_exam_definitions_DiagnosticTemplateId" ON exam_definitions ("DiagnosticTemplateId");
+            CREATE INDEX IF NOT EXISTS "IX_exam_definitions_GroupId" ON exam_definitions ("GroupId");
+            CREATE INDEX IF NOT EXISTS "IX_exam_definitions_StudentId" ON exam_definitions ("StudentId");
+            CREATE INDEX IF NOT EXISTS "IX_exam_definitions_IsPublished" ON exam_definitions ("IsPublished");
+            CREATE TABLE IF NOT EXISTS exam_attempts (
+                "Id" uuid NOT NULL, "ExamId" uuid NOT NULL, "StudentId" uuid NOT NULL, "DiagnosticSessionId" uuid NOT NULL,
+                "StartedAt" timestamp with time zone NOT NULL, "CreatedAt" timestamp with time zone NOT NULL,
+                "UpdatedAt" timestamp with time zone NOT NULL, "Version" bigint NOT NULL,
+                CONSTRAINT "PK_exam_attempts" PRIMARY KEY ("Id")
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_exam_attempts_ExamId_StudentId" ON exam_attempts ("ExamId", "StudentId");
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_exam_attempts_DiagnosticSessionId" ON exam_attempts ("DiagnosticSessionId");
+            """, ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS student_achievements (
+                "Id" uuid NOT NULL, "UserId" uuid NOT NULL, "Code" character varying(120) NOT NULL,
+                "Progress" integer NOT NULL DEFAULT 0, "Target" integer NOT NULL DEFAULT 1,
+                "UnlockedAt" timestamp with time zone NULL,
+                "CreatedAt" timestamp with time zone NOT NULL, "UpdatedAt" timestamp with time zone NOT NULL, "Version" bigint NOT NULL,
+                CONSTRAINT "PK_student_achievements" PRIMARY KEY ("Id")
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_student_achievements_UserId_Code" ON student_achievements ("UserId", "Code");
+            CREATE INDEX IF NOT EXISTS "IX_student_achievements_UserId" ON student_achievements ("UserId");
+            CREATE INDEX IF NOT EXISTS "IX_student_achievements_UnlockedAt" ON student_achievements ("UnlockedAt");
+            """, ct);
+        await _db.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS material_study_cycles (
+                "Id" uuid NOT NULL, "CreatedByUserId" uuid NOT NULL, "PreDiagnosticTemplateId" uuid NOT NULL,
+                "PostDiagnosticTemplateId" uuid NOT NULL, "GroupId" uuid NULL, "Title" character varying(300) NOT NULL,
+                "MaterialText" character varying(20000) NOT NULL, "IsPublished" boolean NOT NULL DEFAULT FALSE,
+                "CreatedAt" timestamp with time zone NOT NULL, "UpdatedAt" timestamp with time zone NOT NULL, "Version" bigint NOT NULL,
+                CONSTRAINT "PK_material_study_cycles" PRIMARY KEY ("Id")
+            );
+            CREATE INDEX IF NOT EXISTS "IX_material_study_cycles_GroupId" ON material_study_cycles ("GroupId");
+            CREATE INDEX IF NOT EXISTS "IX_material_study_cycles_IsPublished" ON material_study_cycles ("IsPublished");
+            CREATE TABLE IF NOT EXISTS material_study_progress (
+                "Id" uuid NOT NULL, "MaterialStudyCycleId" uuid NOT NULL, "StudentId" uuid NOT NULL,
+                "PreSessionId" uuid NULL, "MaterialOpenedAt" timestamp with time zone NULL, "PostSessionId" uuid NULL,
+                "CreatedAt" timestamp with time zone NOT NULL, "UpdatedAt" timestamp with time zone NOT NULL, "Version" bigint NOT NULL,
+                CONSTRAINT "PK_material_study_progress" PRIMARY KEY ("Id")
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS "IX_material_study_progress_MaterialStudyCycleId_StudentId" ON material_study_progress ("MaterialStudyCycleId", "StudentId");
+            CREATE INDEX IF NOT EXISTS "IX_material_study_progress_StudentId" ON material_study_progress ("StudentId");
+            """, ct);
     }
 
     private List<User> BuildUsers()

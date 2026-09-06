@@ -6,6 +6,7 @@ import { EmptyState } from '../components/EmptyState'
 import { ErrorView } from '../components/ErrorView'
 import { LoadingView } from '../components/LoadingView'
 import { StatusBadge } from '../components/StatusBadge'
+import { useAuth } from '../auth/AuthContext'
 import type { DiagnosticComparison, DiagnosticSession } from '../types/api'
 
 function percent(value: number) {
@@ -18,11 +19,12 @@ function signedPercent(value: number) {
 }
 
 export function DiagnosticHistoryPage() {
+  const { user } = useAuth()
   const [fromId, setFromId] = useState('')
   const [toId, setToId] = useState('')
 
   const history = useQuery({
-    queryKey: ['diagnostic-history'],
+    queryKey: ['diagnostic-history', user?.id],
     queryFn: async () => (await api.get<DiagnosticSession[]>('/diagnostics')).data,
   })
 
@@ -37,7 +39,7 @@ export function DiagnosticHistoryPage() {
   const effectiveTo = toId || completed.at(-1)?.id || ''
 
   const comparison = useQuery({
-    queryKey: ['diagnostic-comparison', effectiveFrom, effectiveTo],
+    queryKey: ['diagnostic-comparison', user?.id, effectiveFrom, effectiveTo],
     enabled: Boolean(effectiveFrom && effectiveTo && effectiveFrom !== effectiveTo),
     queryFn: async () => (await api.get<DiagnosticComparison>('/statistics/diagnostics/compare', {
       params: { fromSessionId: effectiveFrom, toSessionId: effectiveTo },

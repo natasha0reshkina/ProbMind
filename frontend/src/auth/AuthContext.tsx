@@ -1,4 +1,5 @@
 import { createContext, PropsWithChildren, useContext, useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { api, tokenStorage } from '../api/client'
 import type { AuthResponse, AuthUser } from '../types/api'
 
@@ -14,6 +15,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: PropsWithChildren) {
+  const queryClient = useQueryClient()
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -31,12 +33,14 @@ export function AuthProvider({ children }: PropsWithChildren) {
   async function login(email: string, password: string) {
     const { data } = await api.post<AuthResponse>('/auth/login', { email, password })
     tokenStorage.save(data.accessToken, data.refreshToken)
+    queryClient.clear()
     setUser(data.user)
   }
 
   async function register(email: string, password: string, displayName: string) {
     const { data } = await api.post<AuthResponse>('/auth/register', { email, password, displayName })
     tokenStorage.save(data.accessToken, data.refreshToken)
+    queryClient.clear()
     setUser(data.user)
   }
 
@@ -46,6 +50,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       if (refreshToken) await api.post('/auth/logout', { refreshToken })
     } finally {
       tokenStorage.clear()
+      queryClient.clear()
       setUser(null)
     }
   }

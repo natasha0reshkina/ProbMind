@@ -36,9 +36,21 @@ public sealed record StudentMistakeDto(
     string CorrectAnswer,
     string? MisconceptionTitle);
 
+
+public sealed record StudentAnswerNoteDto(
+    Guid Id,
+    DateTimeOffset SubmittedAt,
+    string Source,
+    string TopicName,
+    string Prompt,
+    string StudentNote,
+    bool IsCorrect);
+
 public sealed record QuestionAnalyticsDto(
     Guid QuestionId,
     string Code,
+    string TopicName,
+    string Prompt,
     int Responses,
     double CorrectRate,
     double Difficulty,

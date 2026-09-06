@@ -205,6 +205,9 @@ public sealed class PracticeService : IPracticeService
             ExerciseType = request.ExerciseType,
             IsCorrect = option.IsCorrect,
             ResponseTimeMs = Math.Max(0, request.ResponseTimeMs),
+            StudentNote = string.IsNullOrWhiteSpace(request.StudentNote) ? null : request.StudentNote.Trim(),
+            ConfidenceLevel = request.ConfidenceLevel.HasValue ? Math.Clamp(request.ConfidenceLevel.Value, 1, 4) : null,
+            Reasoning = string.IsNullOrWhiteSpace(request.Reasoning) ? null : request.Reasoning.Trim(),
             SubmittedAt = _clock.UtcNow
         };
 
@@ -228,6 +231,15 @@ public sealed class PracticeService : IPracticeService
                 ObservedAt = _clock.UtcNow
             }, ct);
         }
+
+        await _uow.ActivityEvents.AddAsync(new ActivityEvent
+        {
+            UserId = userId,
+            EventType = ActivityEventType.AnswerSubmitted,
+            AggregateType = "PracticeAttempt",
+            AggregateId = attempt.Id,
+            OccurredAt = _clock.UtcNow
+        }, ct);
 
         session.CompletedExercises++;
         session.Touch();

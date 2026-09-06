@@ -33,6 +33,20 @@ public sealed class ProbMindDbContext : DbContext
     public DbSet<QuestionExposure> QuestionExposures => Set<QuestionExposure>();
     public DbSet<DiagnosticReport> DiagnosticReports => Set<DiagnosticReport>();
     public DbSet<LearningPathRevision> LearningPathRevisions => Set<LearningPathRevision>();
+    public DbSet<StudyItem> StudyItems => Set<StudyItem>();
+    public DbSet<StudyItemNote> StudyItemNotes => Set<StudyItemNote>();
+    public DbSet<DiagnosticTemplate> DiagnosticTemplates => Set<DiagnosticTemplate>();
+    public DbSet<DiagnosticTemplateQuestion> DiagnosticTemplateQuestions => Set<DiagnosticTemplateQuestion>();
+    public DbSet<GamificationSettings> GamificationSettings => Set<GamificationSettings>();
+    public DbSet<SpacedReviewItem> SpacedReviewItems => Set<SpacedReviewItem>();
+    public DbSet<StudentGroup> StudentGroups => Set<StudentGroup>();
+    public DbSet<StudentGroupMember> StudentGroupMembers => Set<StudentGroupMember>();
+    public DbSet<TeacherIntervention> TeacherInterventions => Set<TeacherIntervention>();
+    public DbSet<ExamDefinition> ExamDefinitions => Set<ExamDefinition>();
+    public DbSet<ExamAttempt> ExamAttempts => Set<ExamAttempt>();
+    public DbSet<MaterialStudyCycle> MaterialStudyCycles => Set<MaterialStudyCycle>();
+    public DbSet<MaterialStudyProgress> MaterialStudyProgress => Set<MaterialStudyProgress>();
+    public DbSet<StudentAchievement> StudentAchievements => Set<StudentAchievement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

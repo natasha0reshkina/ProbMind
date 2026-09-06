@@ -17,5 +17,6 @@ public sealed class DiagnosticSessionConfiguration : IEntityTypeConfiguration<Di
         builder.HasIndex(x => x.UserId);
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.CreatedAt);
+        builder.HasIndex(x => x.DiagnosticTemplateId);
     }
 }

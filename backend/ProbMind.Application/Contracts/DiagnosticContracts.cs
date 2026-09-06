@@ -29,7 +29,10 @@ public sealed record SubmitDiagnosticAnswerRequest(
     Guid QuestionId,
     Guid QuestionVersionId,
     Guid AnswerOptionId,
-    int ResponseTimeMs);
+    int ResponseTimeMs,
+    string? StudentNote = null,
+    int? ConfidenceLevel = null,
+    string? Reasoning = null);
 
 public sealed record AnswerFeedbackDto(
     bool IsCorrect,

@@ -5,11 +5,13 @@ import { EmptyState } from '../components/EmptyState'
 import { LoadingView } from '../components/LoadingView'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
+import { useAuth } from '../auth/AuthContext'
 import type { UserMisconception } from '../types/api'
 
 export function MisconceptionsPage() {
+  const { user } = useAuth()
   const { data, isLoading } = useQuery({
-    queryKey: ['my-misconceptions'],
+    queryKey: ['my-misconceptions', user?.id],
     queryFn: async () => (await api.get<UserMisconception[]>('/learner/misconceptions')).data,
   })
 

@@ -59,4 +59,3 @@ public sealed record DiagnosticComparisonDto(
     double AccuracyDelta,
     int DetectedMisconceptionDelta,
     IReadOnlyList<TopicComparisonDto> Topics);
-

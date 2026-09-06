@@ -8,17 +8,16 @@ public sealed class UpdateProfileRequestValidatorTests
     private readonly UpdateProfileRequestValidator _sut = new();
 
     [Fact]
-    public void Case_1_ExpectedValidity()
+    public void ValidDisplayName_IsAccepted()
     {
         var result = _sut.Validate(new UpdateProfileRequest("Наталия"));
-        Assert.Equal(true, result.Count == 0);
+        Assert.Empty(result);
     }
 
     [Fact]
-    public void Case_2_ExpectedValidity()
+    public void EmptyDisplayName_IsRejected()
     {
         var result = _sut.Validate(new UpdateProfileRequest(""));
-        Assert.Equal(false, result.Count == 0);
+        Assert.NotEmpty(result);
     }
-
 }

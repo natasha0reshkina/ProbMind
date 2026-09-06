@@ -14,6 +14,7 @@ public sealed class AdminService : IAdminService
 
     public async Task<IReadOnlyList<AdminUserDto>> ListUsersAsync(CancellationToken ct = default) =>
         (await _uow.Users.ListAsync(ct))
+            .Where(x => !x.Email.EndsWith("@probmind.test", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(x => x.CreatedAt)
             .Select(Map)
             .ToArray();

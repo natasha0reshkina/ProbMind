@@ -6,10 +6,12 @@ import { ErrorView } from '../components/ErrorView'
 import { LoadingView } from '../components/LoadingView'
 import { PageHeader } from '../components/PageHeader'
 import { ProgressBar } from '../components/ProgressBar'
+import { useAuth } from '../auth/AuthContext'
 import { statusLabel } from '../components/StatusBadge'
-import type { AnswerFeedback, DiagnosticQuestion, DiagnosticSession } from '../types/api'
+import type { AnswerFeedback, DiagnosticQuestion, DiagnosticSession, DiagnosticTemplate, ExamSessionContext } from '../types/api'
 
 export function DiagnosticPage() {
+  const { user } = useAuth()
   const client = useQueryClient()
   const navigate = useNavigate()
   const { sessionId: resumeSessionId } = useParams<{ sessionId?: string }>()
@@ -17,17 +19,28 @@ export function DiagnosticPage() {
   const [question, setQuestion] = useState<DiagnosticQuestion | null>(null)
   const [feedback, setFeedback] = useState<AnswerFeedback | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [studentNote, setStudentNote] = useState('')
+  const [confidenceLevel, setConfidenceLevel] = useState<number | null>(null)
+  const [reasoning, setReasoning] = useState('')
+  const [examClock, setExamClock] = useState(() => Date.now())
   const startedAt = useMemo(() => performance.now(), [question?.questionId])
 
   const resumeSession = useQuery({
-    queryKey: ['diagnostic-session', resumeSessionId],
+    queryKey: ['diagnostic-session', user?.id, resumeSessionId],
     enabled: Boolean(resumeSessionId),
     retry: false,
     queryFn: async () => (await api.get<DiagnosticSession>(`/diagnostics/${resumeSessionId}`)).data,
   })
 
+  const examContext = useQuery({
+    queryKey: ['exam-session-context', user?.id, resumeSessionId],
+    enabled: Boolean(resumeSessionId),
+    retry: false,
+    queryFn: async () => (await api.get<ExamSessionContext>(`/edtech/exams/session/${resumeSessionId}`)).data,
+  })
+
   const activeSession = useQuery({
-    queryKey: ['diagnostic-active'],
+    queryKey: ['diagnostic-active', user?.id],
     enabled: !resumeSessionId,
     queryFn: async () => {
       const sessions = (await api.get<DiagnosticSession[]>('/diagnostics')).data
@@ -35,9 +48,28 @@ export function DiagnosticPage() {
     },
   })
 
+  const teacherTemplates = useQuery({
+    queryKey: ['diagnostic-templates-student', user?.id],
+    enabled: !resumeSessionId,
+    queryFn: async () => (await api.get<DiagnosticTemplate[]>('/diagnostic-templates/student')).data,
+  })
+
   const start = useMutation({
     mutationFn: async () => (await api.post<DiagnosticSession>('/diagnostics', { questionCount: 15 })).data,
     onSuccess: (data) => setSession(data),
+  })
+
+  const startTemplate = useMutation({
+    mutationFn: async (templateId: string) =>
+      (await api.post<DiagnosticSession>(`/diagnostic-templates/${templateId}/start`)).data,
+    onSuccess: async (data) => {
+      setSession(data)
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['diagnostic-active'] }),
+        client.invalidateQueries({ queryKey: ['diagnostic-history'] }),
+      ])
+      navigate(`/diagnostics/${data.id}/continue`)
+    },
   })
 
   const next = useMutation({
@@ -47,6 +79,9 @@ export function DiagnosticPage() {
       setQuestion(data)
       setFeedback(null)
       setSelected(null)
+      setStudentNote('')
+      setConfidenceLevel(null)
+      setReasoning('')
     },
   })
 
@@ -59,6 +94,9 @@ export function DiagnosticPage() {
         questionVersionId: question.versionId,
         answerOptionId: optionId,
         responseTimeMs: Math.round(performance.now() - startedAt),
+        studentNote: studentNote.trim() || null,
+        confidenceLevel,
+        reasoning: reasoning.trim() || null,
       })).data
     },
     onSuccess: async (data) => {
@@ -70,7 +108,7 @@ export function DiagnosticPage() {
           client.invalidateQueries({ queryKey: ['dashboard'] }),
           client.invalidateQueries({ queryKey: ['diagnostic-history'] }),
           client.invalidateQueries({ queryKey: ['diagnostic-active'] }),
-          client.invalidateQueries({ queryKey: ['diagnostic-session', session.id] }),
+          client.invalidateQueries({ queryKey: ['diagnostic-session', user?.id, session.id] }),
         ])
       }
     },
@@ -91,6 +129,22 @@ export function DiagnosticPage() {
     },
   })
 
+  const examExpiresAtMs = examContext.data?.expiresAt ? new Date(examContext.data.expiresAt).getTime() : null
+  const examSecondsLeft = examExpiresAtMs == null ? null : Math.max(0, Math.ceil((examExpiresAtMs - examClock) / 1000))
+  const examTimeExpired = Boolean(examContext.data?.isExam && examSecondsLeft === 0)
+
+  useEffect(() => {
+    if (!examExpiresAtMs) return
+    setExamClock(Date.now())
+    const timer = window.setInterval(() => setExamClock(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [examExpiresAtMs])
+
+  useEffect(() => {
+    if (!session || !examTimeExpired || complete.isPending || session.status !== 'InProgress') return
+    void complete.mutateAsync()
+  }, [examTimeExpired, session?.id])
+
   useEffect(() => {
     if (!resumeSessionId || !resumeSession.data || session) return
 
@@ -108,11 +162,6 @@ export function DiagnosticPage() {
       setSession(resumeSession.data)
     }
   }, [navigate, resumeSession.data, resumeSessionId, session])
-
-  useEffect(() => {
-    if (resumeSessionId || session || !activeSession.data) return
-    navigate(`/diagnostics/${activeSession.data.id}/continue`, { replace: true })
-  }, [activeSession.data, navigate, resumeSessionId, session])
 
   useEffect(() => {
     if (session && !question && !feedback) void next.mutateAsync(session.id)
@@ -197,6 +246,34 @@ export function DiagnosticPage() {
             {start.isError ? <div className="form-error" role="alert">Не удалось начать диагностику. Попробуйте ещё раз.</div> : null}
           </div>
         </section>
+
+        {(teacherTemplates.data ?? []).length > 0 ? (
+          <section className="plain-section teacher-diagnostic-list-section">
+            <h2>Диагностики преподавателя</h2>
+            <p className="muted">Эти наборы составлены преподавателем из выбранных заданий. Порядок вопросов фиксирован.</p>
+            {unfinished ? <p className="muted">Если начать другую диагностику, текущая незавершённая сессия будет отменена.</p> : null}
+            <div className="study-list">
+              {(teacherTemplates.data ?? []).map((template) => (
+                <article className="study-card" key={template.id}>
+                  <div className="study-card__heading">
+                    <div><span className="eyebrow">{template.questionCount} заданий</span><h3>{template.title}</h3></div>
+                  </div>
+                  {template.description ? <p className="study-card__body">{template.description}</p> : null}
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    disabled={startTemplate.isPending}
+                    onClick={() => startTemplate.mutate(template.id)}
+                  >
+                    {startTemplate.isPending ? 'Открываем…' : 'Начать диагностику'}
+                  </button>
+                </article>
+              ))}
+              {confidenceLevel != null ? <button type="button" className="confidence-clear" disabled={Boolean(feedback) || examTimeExpired} onClick={() => setConfidenceLevel(null)}>Не указывать</button> : null}
+            </div>
+            {startTemplate.isError ? <div className="form-error">Не удалось начать диагностику преподавателя.</div> : null}
+          </section>
+        ) : null}
       </div>
     )
   }
@@ -225,6 +302,10 @@ export function DiagnosticPage() {
     )
   }
 
+  const isExam = Boolean(examContext.data?.isExam)
+  const examExpiresAt = examContext.data?.expiresAt ? new Date(examContext.data.expiresAt) : null
+  const examTimerLabel = examSecondsLeft == null ? null : `${String(Math.floor(examSecondsLeft / 60)).padStart(2, '0')}:${String(examSecondsLeft % 60).padStart(2, '0')}`
+
   return (
     <div className="diagnostic-page">
       <PageHeader
@@ -237,9 +318,10 @@ export function DiagnosticPage() {
         label={`${session.answeredQuestionCount} из ${session.plannedQuestionCount}`}
       />
 
-      <p className="selection-note"><strong>Основание выбора:</strong> {question.selectionExplanation}</p>
+      {isExam ? <div className={`exam-mode-banner ${examTimeExpired ? 'exam-mode-banner--expired' : ''}`}><strong>Экзаменационный режим</strong><span>{examContext.data?.title}{examTimerLabel ? ` · осталось ${examTimerLabel}` : examExpiresAt ? ` · завершить до ${examExpiresAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}` : ''}</span></div> : <p className="selection-note"><strong>Основание выбора:</strong> {question.selectionExplanation}</p>}
 
       <section className="question-card">
+        <div className="question-topic-banner"><span>Тема задания</span><strong>{question.topicName}</strong><em>{statusLabel(question.difficulty)}{question.isTransfer ? ' · перенос' : ''}</em></div>
         <h2>{question.prompt}</h2>
         <div className="answer-grid">
           {question.options.map((option, index) => (
@@ -247,7 +329,7 @@ export function DiagnosticPage() {
               key={option.id}
               type="button"
               className={`answer-option ${selected === option.id ? 'selected' : ''}`}
-              disabled={Boolean(feedback) || submit.isPending}
+              disabled={Boolean(feedback) || submit.isPending || examTimeExpired}
               aria-pressed={selected === option.id}
               onClick={() => setSelected(option.id)}
             >
@@ -257,17 +339,47 @@ export function DiagnosticPage() {
           ))}
         </div>
 
+        <div className="metacognition-block">
+          <div>
+            <strong>Насколько вы уверены в ответе? <span className="optional-mark">Необязательно</span></strong>
+            <div className="confidence-choice">
+              {[{ value: 1, label: 'Совсем не уверен' }, { value: 2, label: 'Скорее не уверен' }, { value: 3, label: 'Скорее уверен' }, { value: 4, label: 'Полностью уверен' }].map((item) => (
+                <button key={item.value} type="button" className={confidenceLevel === item.value ? 'selected' : ''} disabled={Boolean(feedback) || examTimeExpired} onClick={() => setConfidenceLevel((current) => current === item.value ? null : item.value)}>{item.label}</button>
+              ))}
+              {confidenceLevel != null ? <button type="button" className="confidence-clear" disabled={Boolean(feedback) || examTimeExpired} onClick={() => setConfidenceLevel(null)}>Не указывать</button> : null}
+            </div>
+          </div>
+          <label>
+            Ход рассуждения
+            <textarea value={reasoning} onChange={(event) => setReasoning(event.target.value)} placeholder="Необязательно: коротко опишите, как вы пришли к ответу" maxLength={4000} disabled={Boolean(feedback) || examTimeExpired} />
+          </label>
+        </div>
+
+        <label className="question-note-field">
+          Комментарий преподавателю
+          <textarea
+            value={studentNote}
+            onChange={(event) => setStudentNote(event.target.value)}
+            placeholder="Необязательно: напишите, что было непонятно, как вы рассуждали или что хотите уточнить"
+            maxLength={2000}
+            disabled={Boolean(feedback) || submit.isPending || examTimeExpired}
+          />
+          <span className="field-hint">Комментарий сохранится вместе с ответом и будет виден преподавателю.</span>
+        </label>
+
+        {examTimeExpired ? <div className="form-error" role="status">Время экзамена истекло. Формируем итоговый отчёт…</div> : null}
+
         {!feedback ? (
           <div className="answer-actions">
             <button
               type="button"
               className="primary-button"
-              disabled={!selected || submit.isPending}
+              disabled={!selected || submit.isPending || examTimeExpired}
               onClick={() => selected && void submit.mutateAsync(selected)}
             >
               {submit.isPending ? 'Проверяем ответ…' : 'Ответить'}
             </button>
-            {!selected ? <span className="answer-hint">Выберите один вариант ответа</span> : null}
+            {!selected ? <span className="answer-hint">Выберите один вариант ответа</span> : <span className="answer-hint">Степень уверенности можно не указывать</span>}
           </div>
         ) : null}
 
@@ -278,13 +390,20 @@ export function DiagnosticPage() {
         ) : null}
 
         {feedback ? (
-          <div className={`feedback ${feedback.isCorrect ? 'feedback--correct' : 'feedback--wrong'}`}>
-            <strong>{feedback.isCorrect ? 'Верно' : 'Ответ требует разбора'}</strong>
-            <p>{feedback.feedback}</p>
-            <p>{feedback.correctExplanation}</p>
-            {feedback.suspectedMisconceptionCode ? (
-              <div className="feedback-meta">Этот ответ будет учтён при формировании итогового разбора.</div>
-            ) : null}
+          <div className={`feedback ${isExam ? '' : feedback.isCorrect ? 'feedback--correct' : 'feedback--wrong'}`}>
+            {isExam ? (
+              <>
+                <strong>Ответ сохранён</strong>
+                <p>В экзаменационном режиме правильность и разбор будут доступны после завершения.</p>
+              </>
+            ) : (
+              <>
+                <strong>{feedback.isCorrect ? 'Верно' : 'Ответ требует разбора'}</strong>
+                <p>{feedback.feedback}</p>
+                <p>{feedback.correctExplanation}</p>
+                {feedback.suspectedMisconceptionCode ? <div className="feedback-meta">Этот ответ будет учтён при формировании итогового разбора.</div> : null}
+              </>
+            )}
             <button className="primary-button feedback-action" onClick={advance} disabled={next.isPending || complete.isPending}>
               {complete.isPending
                 ? 'Формируем отчёт…'

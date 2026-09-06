@@ -11,4 +11,6 @@ public enum ActivityEventType
     LearningPathRebuilt,
     PracticeStarted,
     PracticeCompleted,
+    ReviewCompleted,
+    MaterialStudied,
 }

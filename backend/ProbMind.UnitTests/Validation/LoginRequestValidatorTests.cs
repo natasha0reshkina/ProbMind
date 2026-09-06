@@ -8,24 +8,23 @@ public sealed class LoginRequestValidatorTests
     private readonly LoginRequestValidator _sut = new();
 
     [Fact]
-    public void Case_1_ExpectedValidity()
+    public void ValidLogin_IsAccepted()
     {
         var result = _sut.Validate(new LoginRequest("student@example.org", "Password1"));
-        Assert.Equal(true, result.Count == 0);
+        Assert.Empty(result);
     }
 
     [Fact]
-    public void Case_2_ExpectedValidity()
+    public void EmptyEmail_IsRejected()
     {
         var result = _sut.Validate(new LoginRequest("", "Password1"));
-        Assert.Equal(false, result.Count == 0);
+        Assert.NotEmpty(result);
     }
 
     [Fact]
-    public void Case_3_ExpectedValidity()
+    public void EmptyPassword_IsRejected()
     {
         var result = _sut.Validate(new LoginRequest("student@example.org", ""));
-        Assert.Equal(false, result.Count == 0);
+        Assert.NotEmpty(result);
     }
-
 }

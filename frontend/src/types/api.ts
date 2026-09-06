@@ -324,6 +324,8 @@ export interface StudentOverview {
 export interface QuestionAnalytics {
   questionId: string
   code: string
+  topicName: string
+  prompt: string
   responses: number
   correctRate: number
   difficulty: number
@@ -557,4 +559,311 @@ export interface ProcessSnapshot {
   uptimeSeconds: number
   framework: string
   os: string
+}
+export type StudyItemKind = 'StudentMaterial' | 'TeacherAssignment'
+export type StudyItemVisibility = 'Private' | 'SharedWithTeacher' | 'AllStudents'
+
+export interface StudyItem {
+  id: string
+  kind: StudyItemKind
+  visibility: StudyItemVisibility
+  title: string
+  body: string
+  studentId?: string | null
+  studentName?: string | null
+  createdByName?: string | null
+  teacherResponse: string
+  discussInClass: boolean
+  teacherRespondedAt?: string | null
+  studentNote: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface StudyItemComment {
+  itemId: string
+  itemTitle: string
+  itemBody: string
+  itemKind: StudyItemKind
+  studentId: string
+  studentName: string
+  comment: string
+  commentedAt: string
+}
+
+export interface StudentAnswerNote {
+  id: string
+  submittedAt: string
+  source: string
+  topicName: string
+  prompt: string
+  studentNote: string
+  isCorrect: boolean
+}
+
+
+export interface DiagnosticTemplate {
+  id: string
+  title: string
+  description: string
+  questionCount: number
+  groupId?: string | null
+  studentId?: string | null
+  isPublished: boolean
+  publishedAt?: string | null
+  createdAt: string
+}
+
+export interface DiagnosticTemplateQuestionCandidate {
+  id: string
+  code: string
+  topicId: string
+  topicCode: string
+  topicName: string
+  prompt: string
+  difficulty: string
+  createdAt: string
+  addedByCurrentUser: boolean
+}
+
+export interface QuestionCsvImportResult {
+  importedCount: number
+  questionIds: string[]
+  codes: string[]
+}
+
+export interface GamificationProfile {
+  leaderboardEnabled: boolean
+  participatesInLeaderboard: boolean
+  currentStreak: number
+  longestStreak: number
+  activeDays: number
+  overallPoints: number
+  overallRank?: number | null
+  participants: number
+}
+
+export interface LeaderboardEntry {
+  userId: string
+  displayName: string
+  rank: number
+  score: number
+  currentStreak: number
+  detail: string
+}
+
+export interface Leaderboard {
+  leaderboardEnabled: boolean
+  category: string
+  participants: number
+  entries: LeaderboardEntry[]
+}
+
+export interface TeacherGamificationStudent {
+  userId: string
+  displayName: string
+  email: string
+  participatesInLeaderboard: boolean
+  currentStreak: number
+  longestStreak: number
+  activeDays: number
+  overallPoints: number
+  lastActivityAt?: string | null
+}
+
+export interface SpacedReview {
+  topicId: string
+  topicCode: string
+  topicName: string
+  mastery: number
+  nextReviewAt: string
+  lastReviewedAt?: string | null
+  intervalDays: number
+  repetitions: number
+  isDue: boolean
+}
+
+export interface ConfidenceAnswer {
+  id: string
+  source: string
+  topicName: string
+  prompt: string
+  isCorrect: boolean
+  confidenceLevel: number
+  reasoning: string
+  submittedAt: string
+  studentId?: string | null
+  studentName?: string | null
+}
+
+export interface ConfidenceSummary {
+  answersWithConfidence: number
+  meanConfidence: number
+  accuracy: number
+  overconfidentWrong: number
+  lowConfidenceCorrect: number
+  answers: ConfidenceAnswer[]
+}
+
+export interface TeacherConfidenceStudent {
+  studentId: string
+  displayName: string
+  answersWithConfidence: number
+  meanConfidence: number
+  accuracy: number
+  overconfidentWrong: number
+  lowConfidenceCorrect: number
+}
+
+export interface StudentGroupMember {
+  studentId: string
+  displayName: string
+  email: string
+}
+
+export interface StudentGroup {
+  id: string
+  name: string
+  description: string
+  members: StudentGroupMember[]
+  createdAt: string
+}
+
+export interface InterventionSuggestion {
+  studentId: string
+  displayName: string
+  mastery: number
+  activeMisconceptions: number
+  daysInactive: number
+  reason: string
+}
+
+export interface TeacherIntervention {
+  id: string
+  studentId: string
+  studentName: string
+  title: string
+  body: string
+  kind: string
+  isCompleted: boolean
+  dueAt?: string | null
+  createdAt: string
+  completedAt?: string | null
+}
+
+export interface Exam {
+  id: string
+  diagnosticTemplateId: string
+  groupId?: string | null
+  groupName?: string | null
+  studentId?: string | null
+  studentName?: string | null
+  title: string
+  description: string
+  timeLimitMinutes: number
+  questionCount: number
+  isPublished: boolean
+  availableFrom?: string | null
+  availableUntil?: string | null
+  sessionId?: string | null
+  sessionStatus?: string | null
+  score?: number | null
+  startedAt?: string | null
+  assignedStudents: number
+  completedStudents: number
+  allCompleted: boolean
+}
+
+export interface ExamAnswerReview {
+  position: number
+  prompt: string
+  selectedAnswer?: string | null
+  correctAnswer: string
+  isCorrect?: boolean | null
+  confidenceLevel?: number | null
+  reasoning?: string | null
+  studentNote?: string | null
+  responseTimeMs?: number | null
+}
+
+export interface ExamStudentReview {
+  studentId: string
+  studentName: string
+  email: string
+  status: string
+  score?: number | null
+  startedAt?: string | null
+  completedAt?: string | null
+  answers: ExamAnswerReview[]
+}
+
+export interface TeacherExamReview {
+  examId: string
+  title: string
+  audience: string
+  assignedStudents: number
+  completedStudents: number
+  allCompleted: boolean
+  students: ExamStudentReview[]
+}
+
+export interface ExamStart {
+  examId: string
+  sessionId: string
+  timeLimitMinutes: number
+  startedAt: string
+  expiresAt: string
+}
+
+export interface ExamSessionContext {
+  isExam: boolean
+  examId?: string | null
+  title?: string | null
+  timeLimitMinutes?: number | null
+  startedAt?: string | null
+  expiresAt?: string | null
+}
+
+export interface Achievement {
+  code: string
+  title: string
+  description: string
+  unlocked: boolean
+  progress: number
+  target: number
+}
+
+export interface MaterialStudyCycle {
+  id: string
+  title: string
+  materialText: string
+  preDiagnosticTemplateId: string
+  postDiagnosticTemplateId: string
+  groupId?: string | null
+  groupName?: string | null
+  isPublished: boolean
+  preSessionId?: string | null
+  preStatus?: string | null
+  preScore?: number | null
+  materialOpenedAt?: string | null
+  postSessionId?: string | null
+  postStatus?: string | null
+  postScore?: number | null
+  scoreDelta?: number | null
+  createdAt: string
+}
+
+export interface TeacherMaterialCycleAnalytics {
+  id: string
+  title: string
+  groupName?: string | null
+  isPublished: boolean
+  students: number
+  completedPre: number
+  openedMaterial: number
+  completedPost: number
+  meanPreScore?: number | null
+  meanPostScore?: number | null
+  meanDelta?: number | null
+  createdAt: string
 }

@@ -15,6 +15,8 @@ public sealed class PracticeAttemptConfiguration : IEntityTypeConfiguration<Prac
         builder.Property(x => x.UpdatedAt).IsRequired();
         builder.HasIndex(x => x.PracticeSessionId);
         builder.HasIndex(x => x.UserId);
+        builder.Property(x => x.StudentNote).HasMaxLength(2000);
+        builder.Property(x => x.Reasoning).HasMaxLength(4000);
         builder.HasIndex(x => x.QuestionId);
         builder.HasIndex(x => new { x.PracticeSessionId, x.QuestionId }).IsUnique();
     }

@@ -66,6 +66,11 @@ public static class DependencyInjection
         services.AddScoped<IResearchAnalyticsService, ResearchAnalyticsService>();
         services.AddScoped<IExportService, ExportService>();
         services.AddScoped<IAdvancedAnalyticsService, AdvancedAnalyticsService>();
+        services.AddScoped<IStudyWorkspaceService, StudyWorkspaceService>();
+        services.AddScoped<IDiagnosticTemplateService, DiagnosticTemplateService>();
+        services.AddScoped<IQuestionCsvImportService, QuestionCsvImportService>();
+        services.AddScoped<IGamificationService, GamificationService>();
+        services.AddScoped<IEdTechService, EdTechService>();
 
         return services;
     }

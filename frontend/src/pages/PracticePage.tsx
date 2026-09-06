@@ -7,6 +7,7 @@ import { ErrorView } from '../components/ErrorView'
 import { LoadingView } from '../components/LoadingView'
 import { PageHeader } from '../components/PageHeader'
 import { ProgressBar } from '../components/ProgressBar'
+import { useAuth } from '../auth/AuthContext'
 import { statusLabel } from '../components/StatusBadge'
 import type {
   AnswerFeedback,
@@ -19,6 +20,7 @@ import type {
 } from '../types/api'
 
 export function PracticePage() {
+  const { user } = useAuth()
   const client = useQueryClient()
   const navigate = useNavigate()
   const { sessionId: resumeSessionId } = useParams<{ sessionId?: string }>()
@@ -31,6 +33,9 @@ export function PracticePage() {
   const [question, setQuestion] = useState<DiagnosticQuestion | null>(null)
   const [feedback, setFeedback] = useState<AnswerFeedback | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [studentNote, setStudentNote] = useState('')
+  const [confidenceLevel, setConfidenceLevel] = useState<number | null>(null)
+  const [reasoning, setReasoning] = useState('')
   const [step, setStep] = useState(0)
   const [lastResult, setLastResult] = useState<PracticeResult | null>(null)
   const [completionError, setCompletionError] = useState(false)
@@ -47,24 +52,24 @@ export function PracticePage() {
   })
 
   const learnerMisconceptions = useQuery({
-    queryKey: ['my-misconceptions'],
+    queryKey: ['my-misconceptions', user?.id],
     queryFn: async () => (await api.get<UserMisconception[]>('/learner/misconceptions')).data,
   })
 
   const history = useQuery({
-    queryKey: ['practice-history'],
+    queryKey: ['practice-history', user?.id],
     queryFn: async () => (await api.get<PracticeSession[]>('/practice/history')).data,
   })
 
   const resumeSession = useQuery({
-    queryKey: ['practice-session', resumeSessionId],
+    queryKey: ['practice-session', user?.id, resumeSessionId],
     enabled: Boolean(resumeSessionId),
     retry: false,
     queryFn: async () => (await api.get<PracticeSession>(`/practice/${resumeSessionId}`)).data,
   })
 
   const activeSession = useQuery({
-    queryKey: ['practice-active'],
+    queryKey: ['practice-active', user?.id],
     enabled: !resumeSessionId,
     queryFn: async () => {
       const sessions = (await api.get<PracticeSession[]>('/practice/history')).data
@@ -129,6 +134,9 @@ export function PracticePage() {
       setQuestion(null)
       setFeedback(null)
       setSelected(null)
+      setStudentNote('')
+      setConfidenceLevel(null)
+      setReasoning('')
       setStep(0)
       setLastResult(null)
       setCompletionError(false)
@@ -147,6 +155,9 @@ export function PracticePage() {
       setQuestion(data)
       setFeedback(null)
       setSelected(null)
+      setStudentNote('')
+      setConfidenceLevel(null)
+      setReasoning('')
     },
   })
 
@@ -165,6 +176,9 @@ export function PracticePage() {
         answerOptionId,
         exerciseType: exerciseTypes[Math.min(step, exerciseTypes.length - 1)],
         responseTimeMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        studentNote: studentNote.trim() || null,
+        confidenceLevel,
+        reasoning: reasoning.trim() || null,
       })).data
     },
     onSuccess: async (data) => {
@@ -211,6 +225,9 @@ export function PracticePage() {
     setQuestion(null)
     setFeedback(null)
     setSelected(null)
+    setConfidenceLevel(null)
+    setReasoning('')
+    setStudentNote('')
     await next.mutateAsync(session.id)
   }
 
@@ -303,6 +320,7 @@ export function PracticePage() {
                   </div>
                 </article>
               ))}
+              {confidenceLevel != null ? <button type="button" className="confidence-clear" disabled={Boolean(feedback)} onClick={() => setConfidenceLevel(null)}>Не указывать</button> : null}
             </div>
           </section>
         ) : null}
@@ -382,7 +400,7 @@ export function PracticePage() {
 
       {question ? (
         <section className="question-card">
-          <span className="eyebrow">{question.isTransfer ? 'Задание на перенос' : statusLabel(question.difficulty)}</span>
+          <div className="question-topic-banner"><span>Тема задания</span><strong>{question.topicName}</strong><em>{question.isTransfer ? 'Задание на перенос' : statusLabel(question.difficulty)}</em></div>
           <h2>{question.prompt}</h2>
           <div className="answer-grid">
             {question.options.map((option, index) => (
@@ -400,6 +418,34 @@ export function PracticePage() {
             ))}
           </div>
 
+          <div className="metacognition-block">
+            <div>
+              <strong>Насколько вы уверены в ответе? <span className="optional-mark">Необязательно</span></strong>
+              <div className="confidence-choice">
+                {[{ value: 1, label: 'Совсем не уверен' }, { value: 2, label: 'Скорее не уверен' }, { value: 3, label: 'Скорее уверен' }, { value: 4, label: 'Полностью уверен' }].map((item) => (
+                  <button key={item.value} type="button" className={confidenceLevel === item.value ? 'selected' : ''} disabled={Boolean(feedback)} onClick={() => setConfidenceLevel((current) => current === item.value ? null : item.value)}>{item.label}</button>
+                ))}
+                {confidenceLevel != null ? <button type="button" className="confidence-clear" disabled={Boolean(feedback)} onClick={() => setConfidenceLevel(null)}>Не указывать</button> : null}
+              </div>
+            </div>
+            <label>
+              Ход рассуждения
+              <textarea value={reasoning} onChange={(event) => setReasoning(event.target.value)} placeholder="Необязательно: коротко опишите, как вы пришли к ответу" maxLength={4000} disabled={Boolean(feedback)} />
+            </label>
+          </div>
+
+          <label className="question-note-field">
+            Комментарий преподавателю
+            <textarea
+              value={studentNote}
+              onChange={(event) => setStudentNote(event.target.value)}
+              placeholder="Необязательно: оставьте вопрос или комментарий к решению"
+              maxLength={2000}
+              disabled={Boolean(feedback) || submit.isPending}
+            />
+            <span className="field-hint">Комментарий сохранится вместе с ответом и будет виден преподавателю.</span>
+          </label>
+
           {!feedback ? (
             <div className="answer-actions">
               <button
@@ -410,7 +456,7 @@ export function PracticePage() {
               >
                 {submit.isPending ? 'Проверяем ответ…' : 'Ответить'}
               </button>
-              {!selected ? <span className="answer-hint">Выберите один вариант ответа</span> : null}
+              {!selected ? <span className="answer-hint">Выберите один вариант ответа</span> : <span className="answer-hint">Степень уверенности можно не указывать</span>}
             </div>
           ) : null}
 

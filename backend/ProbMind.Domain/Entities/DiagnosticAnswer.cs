@@ -12,5 +12,8 @@ public sealed class DiagnosticAnswer : Entity
     public bool IsCorrect { get; set; }
     public int ResponseTimeMs { get; set; }
     public int SequenceNumber { get; set; }
+    public string? StudentNote { get; set; }
+    public int? ConfidenceLevel { get; set; }
+    public string? Reasoning { get; set; }
     public DateTimeOffset SubmittedAt { get; set; } = DateTimeOffset.UtcNow;
 }

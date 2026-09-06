@@ -36,6 +36,20 @@ public sealed class UnitOfWork : IUnitOfWork
         Notifications = new EfRepository<Notification>(db);
         QuestionExposures = new EfRepository<QuestionExposure>(db);
         DiagnosticReports = new EfRepository<DiagnosticReport>(db);
+        StudyItems = new EfRepository<StudyItem>(db);
+        StudyItemNotes = new EfRepository<StudyItemNote>(db);
+        DiagnosticTemplates = new EfRepository<DiagnosticTemplate>(db);
+        DiagnosticTemplateQuestions = new EfRepository<DiagnosticTemplateQuestion>(db);
+        GamificationSettings = new EfRepository<GamificationSettings>(db);
+        SpacedReviewItems = new EfRepository<SpacedReviewItem>(db);
+        StudentGroups = new EfRepository<StudentGroup>(db);
+        StudentGroupMembers = new EfRepository<StudentGroupMember>(db);
+        TeacherInterventions = new EfRepository<TeacherIntervention>(db);
+        ExamDefinitions = new EfRepository<ExamDefinition>(db);
+        ExamAttempts = new EfRepository<ExamAttempt>(db);
+        MaterialStudyCycles = new EfRepository<MaterialStudyCycle>(db);
+        MaterialStudyProgress = new EfRepository<MaterialStudyProgress>(db);
+        StudentAchievements = new EfRepository<StudentAchievement>(db);
     }
 
     public IRepository<User> Users { get; }
@@ -64,6 +78,20 @@ public sealed class UnitOfWork : IUnitOfWork
     public IRepository<Notification> Notifications { get; }
     public IRepository<QuestionExposure> QuestionExposures { get; }
     public IRepository<DiagnosticReport> DiagnosticReports { get; }
+    public IRepository<StudyItem> StudyItems { get; }
+    public IRepository<StudyItemNote> StudyItemNotes { get; }
+    public IRepository<DiagnosticTemplate> DiagnosticTemplates { get; }
+    public IRepository<DiagnosticTemplateQuestion> DiagnosticTemplateQuestions { get; }
+    public IRepository<GamificationSettings> GamificationSettings { get; }
+    public IRepository<SpacedReviewItem> SpacedReviewItems { get; }
+    public IRepository<StudentGroup> StudentGroups { get; }
+    public IRepository<StudentGroupMember> StudentGroupMembers { get; }
+    public IRepository<TeacherIntervention> TeacherInterventions { get; }
+    public IRepository<ExamDefinition> ExamDefinitions { get; }
+    public IRepository<ExamAttempt> ExamAttempts { get; }
+    public IRepository<MaterialStudyCycle> MaterialStudyCycles { get; }
+    public IRepository<MaterialStudyProgress> MaterialStudyProgress { get; }
+    public IRepository<StudentAchievement> StudentAchievements { get; }
 
     public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
         _db.SaveChangesAsync(cancellationToken);

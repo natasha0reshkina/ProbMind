@@ -13,5 +13,8 @@ public sealed class PracticeAttempt : Entity
     public ExerciseType ExerciseType { get; set; }
     public bool IsCorrect { get; set; }
     public int ResponseTimeMs { get; set; }
+    public string? StudentNote { get; set; }
+    public int? ConfidenceLevel { get; set; }
+    public string? Reasoning { get; set; }
     public DateTimeOffset SubmittedAt { get; set; } = DateTimeOffset.UtcNow;
 }

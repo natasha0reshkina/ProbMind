@@ -8,38 +8,37 @@ public sealed class StartDiagnosticRequestValidatorTests
     private readonly StartDiagnosticRequestValidator _sut = new();
 
     [Fact]
-    public void Case_1_ExpectedValidity()
+    public void TenQuestions_IsAccepted()
     {
         var result = _sut.Validate(new StartDiagnosticRequest(10));
-        Assert.Equal(true, result.Count == 0);
+        Assert.Empty(result);
     }
 
     [Fact]
-    public void Case_2_ExpectedValidity()
+    public void FifteenQuestions_IsAccepted()
     {
         var result = _sut.Validate(new StartDiagnosticRequest(15));
-        Assert.Equal(true, result.Count == 0);
+        Assert.Empty(result);
     }
 
     [Fact]
-    public void Case_3_ExpectedValidity()
+    public void ThirtyQuestions_IsAccepted()
     {
         var result = _sut.Validate(new StartDiagnosticRequest(30));
-        Assert.Equal(true, result.Count == 0);
+        Assert.Empty(result);
     }
 
     [Fact]
-    public void Case_4_ExpectedValidity()
+    public void NineQuestions_IsRejected()
     {
         var result = _sut.Validate(new StartDiagnosticRequest(9));
-        Assert.Equal(false, result.Count == 0);
+        Assert.NotEmpty(result);
     }
 
     [Fact]
-    public void Case_5_ExpectedValidity()
+    public void ThirtyOneQuestions_IsRejected()
     {
         var result = _sut.Validate(new StartDiagnosticRequest(31));
-        Assert.Equal(false, result.Count == 0);
+        Assert.NotEmpty(result);
     }
-
 }

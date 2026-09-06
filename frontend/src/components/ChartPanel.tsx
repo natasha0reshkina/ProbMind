@@ -147,13 +147,24 @@ export function BarChartPanel({ title, subtitle, data, xKey, series, percent, he
           <CartesianGrid strokeDasharray="3 3" stroke="#e8edf5" horizontal={!horizontal} vertical={horizontal} />
           {horizontal ? (
             <>
-              <XAxis type="number" tickFormatter={(value) => percent ? `${Math.round(value * 100)}%` : String(value)} tick={{ fontSize: 11 }} />
+              <XAxis
+                type="number"
+                domain={percent ? [0, 1] : undefined}
+                ticks={percent ? [0, .25, .5, .75, 1] : undefined}
+                tickFormatter={(value) => percent ? `${Math.round(value * 100)}%` : String(value)}
+                tick={{ fontSize: 11 }}
+              />
               <YAxis type="category" dataKey={xKey} width={170} tick={<WrappedCategoryTick />} interval={0} />
             </>
           ) : (
             <>
               <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
-              <YAxis tickFormatter={(value) => percent ? `${Math.round(value * 100)}%` : String(value)} tick={{ fontSize: 11 }} />
+              <YAxis
+                domain={percent ? [0, 1] : undefined}
+                ticks={percent ? [0, .25, .5, .75, 1] : undefined}
+                tickFormatter={(value) => percent ? `${Math.round(value * 100)}%` : String(value)}
+                tick={{ fontSize: 11 }}
+              />
             </>
           )}
           <Tooltip formatter={(value) => percent && typeof value === 'number' ? `${(value * 100).toFixed(1)}%` : value} />

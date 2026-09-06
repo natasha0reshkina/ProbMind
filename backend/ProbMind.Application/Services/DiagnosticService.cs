@@ -76,6 +76,77 @@ public sealed class DiagnosticService : IDiagnosticService
         return Map(session);
     }
 
+    public async Task<DiagnosticSessionDto> StartTemplateAsync(
+        Guid userId,
+        Guid templateId,
+        CancellationToken ct = default)
+    {
+        var template = await _uow.DiagnosticTemplates.GetByIdAsync(templateId, ct)
+            ?? throw new KeyNotFoundException("Диагностика преподавателя не найдена.");
+        if (!template.IsPublished)
+            throw new InvalidOperationException("Эта диагностика пока не опубликована.");
+        if (template.StudentId.HasValue && template.StudentId.Value != userId)
+            throw new UnauthorizedAccessException("Эта диагностика назначена другому студенту.");
+        if (template.GroupId.HasValue &&
+            !await _uow.StudentGroupMembers.AnyAsync(x => x.GroupId == template.GroupId.Value && x.StudentId == userId, ct))
+            throw new UnauthorizedAccessException("Эта диагностика назначена другой группе.");
+
+        var active = await _uow.DiagnosticSessions.WhereAsync(
+            x => x.UserId == userId &&
+                 (x.Status == DiagnosticStatus.Created || x.Status == DiagnosticStatus.InProgress),
+            ct);
+
+        var sameTemplate = active
+            .Where(x => x.DiagnosticTemplateId == templateId)
+            .OrderByDescending(x => x.AnsweredQuestionCount)
+            .ThenByDescending(x => x.UpdatedAt)
+            .FirstOrDefault();
+        if (sameTemplate is not null)
+            return Map(sameTemplate);
+
+        if (active.Count > 0)
+        {
+            foreach (var previous in active)
+            {
+                previous.Status = DiagnosticStatus.Cancelled;
+                previous.CompletedAt ??= _clock.UtcNow;
+                previous.Touch();
+                _uow.DiagnosticSessions.Update(previous);
+            }
+            await _uow.SaveChangesAsync(ct);
+        }
+
+        var templateQuestions = await _uow.DiagnosticTemplateQuestions.WhereAsync(
+            x => x.DiagnosticTemplateId == templateId,
+            ct);
+        var count = templateQuestions.Count;
+        if (count < 1 || count > 30)
+            throw new InvalidOperationException("Диагностика должна содержать от 1 до 30 заданий.");
+
+        var session = new DiagnosticSession
+        {
+            UserId = userId,
+            PlannedQuestionCount = count,
+            AnsweredQuestionCount = 0,
+            Status = DiagnosticStatus.InProgress,
+            StartedAt = _clock.UtcNow,
+            SelectionPolicyVersion = "teacher-template-v1",
+            DiagnosticTemplateId = templateId
+        };
+
+        await _uow.DiagnosticSessions.AddAsync(session, ct);
+        await _uow.ActivityEvents.AddAsync(new ActivityEvent
+        {
+            UserId = userId,
+            EventType = ActivityEventType.DiagnosticStarted,
+            AggregateType = nameof(DiagnosticSession),
+            AggregateId = session.Id,
+            PayloadJson = JsonSerializer.Serialize(new { templateId, template.Title, count })
+        }, ct);
+        await _uow.SaveChangesAsync(ct);
+        return Map(session);
+    }
+
     public async Task<IReadOnlyList<DiagnosticSessionDto>> ListAsync(
         Guid userId,
         CancellationToken ct = default)
@@ -115,26 +186,58 @@ public sealed class DiagnosticService : IDiagnosticService
         if (session.Status != DiagnosticStatus.InProgress)
             throw new InvalidOperationException("Diagnostic session is not in progress.");
 
+        if (await IsExpiredExamSessionAsync(session.Id, ct))
+            return null;
+
         if (session.AnsweredQuestionCount >= session.PlannedQuestionCount)
             return null;
+
+        if (session.DiagnosticTemplateId.HasValue)
+            return await NextTemplateQuestionAsync(userId, session, ct);
 
         var questions = (await _uow.Questions.WhereAsync(
             x => x.Status == ContentStatus.Published && x.Kind == QuestionKind.Diagnostic,
             ct)).ToArray();
 
         var versions = await _uow.QuestionVersions.ListAsync(ct);
+        var currentVersionByQuestionId = questions
+            .Select(question => new
+            {
+                question.Id,
+                Version = versions.SingleOrDefault(x =>
+                    x.QuestionId == question.Id && x.VersionNumber == question.CurrentVersionNumber)
+            })
+            .Where(x => x.Version is not null)
+            .ToDictionary(x => x.Id, x => x.Version!);
+        var promptKeyByQuestionId = currentVersionByQuestionId
+            .ToDictionary(x => x.Key, x => NormalizePrompt(x.Value.Prompt));
         var maps = await _uow.QuestionMisconceptionMaps.ListAsync(ct);
         var masteries = await _uow.TopicMasteries.WhereAsync(x => x.UserId == userId, ct);
         var misconceptionStates = await _uow.UserMisconceptions.WhereAsync(x => x.UserId == userId, ct);
-        var exposures = await _uow.QuestionExposures.WhereAsync(x => x.UserId == userId, ct);
+        var allExposures = await _uow.QuestionExposures.ListAsync(ct);
+        var exposures = allExposures.Where(x => x.UserId == userId).ToArray();
         var answered = await _uow.DiagnosticAnswers.WhereAsync(
             x => x.UserId == userId && x.SessionId == sessionId,
             ct);
 
         var answeredQuestionIds = answered.Select(x => x.QuestionId).ToHashSet();
+        var answeredPromptKeys = answeredQuestionIds
+            .Where(promptKeyByQuestionId.ContainsKey)
+            .Select(id => promptKeyByQuestionId[id])
+            .ToHashSet(StringComparer.Ordinal);
         var masteryByTopic = masteries.ToDictionary(x => x.TopicId, x => x.Mastery);
         var confidenceByMisconception = misconceptionStates.ToDictionary(x => x.MisconceptionId, x => x.Confidence);
         var exposureByQuestion = exposures.ToDictionary(x => x.QuestionId);
+        var globalExposureCountByQuestion = allExposures
+            .GroupBy(x => x.QuestionId)
+            .ToDictionary(x => x.Key, x => x.Sum(item => item.ExposureCount));
+        var globalExposureCountByPrompt = allExposures
+            .Where(x => promptKeyByQuestionId.ContainsKey(x.QuestionId))
+            .GroupBy(x => promptKeyByQuestionId[x.QuestionId], StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group.Sum(item => item.ExposureCount),
+                StringComparer.Ordinal);
         var questionById = questions.ToDictionary(x => x.Id);
         var answeredByTopic = answered
             .Where(x => questionById.ContainsKey(x.QuestionId))
@@ -165,20 +268,36 @@ public sealed class DiagnosticService : IDiagnosticService
             .ToHashSet();
 
         var unansweredQuestions = questions
-            .Where(x => !answeredQuestionIds.Contains(x.Id))
+            .Where(x =>
+                !answeredQuestionIds.Contains(x.Id) &&
+                currentVersionByQuestionId.ContainsKey(x.Id) &&
+                !answeredPromptKeys.Contains(promptKeyByQuestionId[x.Id]))
             .ToArray();
         var coveragePool = unansweredQuestions.Where(x => topicsBelowTarget.Contains(x.TopicId)).ToArray();
         var eligibleQuestions = coveragePool.Length > 0 ? coveragePool : unansweredQuestions;
+
+        if (eligibleQuestions.Length > 0)
+        {
+            eligibleQuestions = eligibleQuestions
+                .GroupBy(x => promptKeyByQuestionId[x.Id], StringComparer.Ordinal)
+                .Select(group => group
+                    .OrderBy(x => globalExposureCountByQuestion.GetValueOrDefault(x.Id))
+                    .ThenBy(x => x.CreatedAt)
+                    .First())
+                .ToArray();
+
+            var leastGlobalExposure = eligibleQuestions
+                .Min(x => globalExposureCountByPrompt.GetValueOrDefault(promptKeyByQuestionId[x.Id]));
+            eligibleQuestions = eligibleQuestions
+                .Where(x => globalExposureCountByPrompt.GetValueOrDefault(promptKeyByQuestionId[x.Id]) == leastGlobalExposure)
+                .ToArray();
+        }
 
         var candidates = new List<AdaptiveCandidate>();
 
         foreach (var question in eligibleQuestions)
         {
-            var currentVersion = versions
-                .Where(x => x.QuestionId == question.Id && x.VersionNumber == question.CurrentVersionNumber)
-                .SingleOrDefault();
-
-            if (currentVersion is null)
+            if (!currentVersionByQuestionId.TryGetValue(question.Id, out var currentVersion))
                 continue;
 
             var questionMaps = maps.Where(x => x.QuestionId == question.Id).ToArray();
@@ -237,9 +356,7 @@ public sealed class DiagnosticService : IDiagnosticService
             return null;
 
         var selected = questions.Single(x => x.Id == best.QuestionId);
-        var version = versions.Single(x =>
-            x.QuestionId == selected.Id &&
-            x.VersionNumber == selected.CurrentVersionNumber);
+        var version = currentVersionByQuestionId[selected.Id];
 
         var topic = await _uow.Topics.GetByIdAsync(selected.TopicId, ct)
             ?? throw new InvalidOperationException("Question topic does not exist.");
@@ -271,6 +388,9 @@ public sealed class DiagnosticService : IDiagnosticService
         if (session.Status != DiagnosticStatus.InProgress)
             throw new InvalidOperationException("Diagnostic session is not in progress.");
 
+        if (await IsExpiredExamSessionAsync(session.Id, ct))
+            throw new InvalidOperationException("Время экзамена истекло. Завершите экзамен и откройте итоговый отчёт.");
+
         var duplicate = await _uow.DiagnosticAnswers.AnyAsync(
             x => x.SessionId == request.SessionId && x.QuestionId == request.QuestionId,
             ct);
@@ -281,7 +401,8 @@ public sealed class DiagnosticService : IDiagnosticService
         var question = await _uow.Questions.GetByIdAsync(request.QuestionId, ct)
             ?? throw new KeyNotFoundException("Question not found.");
 
-        if (question.Kind != QuestionKind.Diagnostic || question.Status != ContentStatus.Published)
+        if (question.Kind != QuestionKind.Diagnostic ||
+            (question.Status != ContentStatus.Published && !session.DiagnosticTemplateId.HasValue))
             throw new InvalidOperationException("Question is not available for diagnostic use.");
 
         var version = await _uow.QuestionVersions.GetByIdAsync(request.QuestionVersionId, ct)
@@ -306,6 +427,9 @@ public sealed class DiagnosticService : IDiagnosticService
             IsCorrect = option.IsCorrect,
             ResponseTimeMs = Math.Max(0, request.ResponseTimeMs),
             SequenceNumber = session.AnsweredQuestionCount + 1,
+            StudentNote = string.IsNullOrWhiteSpace(request.StudentNote) ? null : request.StudentNote.Trim(),
+            ConfidenceLevel = request.ConfidenceLevel.HasValue ? Math.Clamp(request.ConfidenceLevel.Value, 1, 4) : null,
+            Reasoning = string.IsNullOrWhiteSpace(request.Reasoning) ? null : request.Reasoning.Trim(),
             SubmittedAt = _clock.UtcNow
         };
 
@@ -407,7 +531,7 @@ public sealed class DiagnosticService : IDiagnosticService
         if (session.Status is DiagnosticStatus.ReportReady or DiagnosticStatus.Completed)
             return await ReportAsync(userId, sessionId, ct);
 
-        if (session.AnsweredQuestionCount < session.PlannedQuestionCount)
+        if (session.AnsweredQuestionCount < session.PlannedQuestionCount && !await IsExpiredExamSessionAsync(session.Id, ct))
             throw new InvalidOperationException("Not enough answers to complete diagnostic.");
 
         session.Status = DiagnosticStatus.Analyzing;
@@ -425,7 +549,9 @@ public sealed class DiagnosticService : IDiagnosticService
             ct);
 
         var correct = answers.Count(x => x.IsCorrect);
-        var accuracy = answers.Count == 0 ? 0d : correct / (double)answers.Count;
+        var isExamSession = await _uow.ExamAttempts.AnyAsync(x => x.DiagnosticSessionId == sessionId, ct);
+        var scoreDenominator = isExamSession ? session.PlannedQuestionCount : answers.Count;
+        var accuracy = scoreDenominator == 0 ? 0d : correct / (double)scoreDenominator;
 
         session.OverallScore = accuracy;
         session.Status = DiagnosticStatus.ReportReady;
@@ -443,7 +569,7 @@ public sealed class DiagnosticService : IDiagnosticService
         var weakest = topics.OrderBy(x => x.Mastery).FirstOrDefault();
 
         var summary =
-            $"Диагностика завершена: правильных ответов {correct} из {answers.Count} ({accuracy:P0}). " +
+            $"Диагностика завершена: правильных ответов {correct} из {scoreDenominator} ({accuracy:P0}). " +
             $"Наиболее сильная тема: {strongest?.Name ?? "н/д"}; " +
             $"наиболее приоритетная для повторения: {weakest?.Name ?? "н/д"}. " +
             $"Активных устойчивых заблуждений: {detected}.";
@@ -530,6 +656,54 @@ public sealed class DiagnosticService : IDiagnosticService
             report.GeneratedAt);
     }
 
+    private async Task<DiagnosticQuestionDto?> NextTemplateQuestionAsync(
+        Guid userId,
+        DiagnosticSession session,
+        CancellationToken ct)
+    {
+        if (!session.DiagnosticTemplateId.HasValue)
+            return null;
+
+        var entries = (await _uow.DiagnosticTemplateQuestions.WhereAsync(
+            x => x.DiagnosticTemplateId == session.DiagnosticTemplateId.Value,
+            ct))
+            .OrderBy(x => x.Position)
+            .ToArray();
+        var answers = await _uow.DiagnosticAnswers.WhereAsync(
+            x => x.UserId == userId && x.SessionId == session.Id,
+            ct);
+        var answeredIds = answers.Select(x => x.QuestionId).ToHashSet();
+        var entry = entries.FirstOrDefault(x => !answeredIds.Contains(x.QuestionId));
+        if (entry is null)
+            return null;
+
+        var question = await _uow.Questions.GetByIdAsync(entry.QuestionId, ct)
+            ?? throw new KeyNotFoundException("Задание из диагностики не найдено.");
+        var versions = await _uow.QuestionVersions.WhereAsync(
+            x => x.QuestionId == question.Id && x.VersionNumber == question.CurrentVersionNumber,
+            ct);
+        var version = versions.SingleOrDefault()
+            ?? throw new InvalidOperationException("У задания отсутствует текущая версия.");
+        var topic = await _uow.Topics.GetByIdAsync(question.TopicId, ct)
+            ?? throw new InvalidOperationException("Тема задания не найдена.");
+        var optionEntities = await _uow.AnswerOptions.WhereAsync(
+            x => x.QuestionVersionId == version.Id,
+            ct);
+        var options = AnswerOptionOrdering.ForSession(optionEntities, session.Id, question.Id);
+        var position = Array.IndexOf(entries, entry) + 1;
+
+        return new DiagnosticQuestionDto(
+            question.Id,
+            version.Id,
+            topic.Code,
+            topic.NameRu,
+            version.Prompt,
+            version.Difficulty,
+            version.IsTransferQuestion,
+            options,
+            $"Диагностика преподавателя · вопрос {position} из {entries.Length}.");
+    }
+
     private async Task<DiagnosticSession?> NormalizeActiveSessionAsync(
         Guid userId,
         CancellationToken ct)
@@ -573,6 +747,17 @@ public sealed class DiagnosticService : IDiagnosticService
             await _uow.SaveChangesAsync(ct);
 
         return canonical;
+    }
+
+
+    private async Task<bool> IsExpiredExamSessionAsync(Guid sessionId, CancellationToken ct)
+    {
+        var attempt = (await _uow.ExamAttempts.WhereAsync(x => x.DiagnosticSessionId == sessionId, ct)).SingleOrDefault();
+        if (attempt is null)
+            return false;
+
+        var exam = await _uow.ExamDefinitions.GetByIdAsync(attempt.ExamId, ct);
+        return exam is not null && _clock.UtcNow >= attempt.StartedAt.AddMinutes(exam.TimeLimitMinutes);
     }
 
     private async Task<DiagnosticSession> GetOwnedSessionAsync(
@@ -643,6 +828,12 @@ public sealed class DiagnosticService : IDiagnosticService
         if (!isNew)
             _uow.QuestionExposures.Update(exposure);
     }
+
+    private static string NormalizePrompt(string prompt) =>
+        string.Join(" ", prompt
+            .Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            .Trim()
+            .ToLowerInvariant();
 
     private static DiagnosticSessionDto Map(DiagnosticSession session) =>
         new(

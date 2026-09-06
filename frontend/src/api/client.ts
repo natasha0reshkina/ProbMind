@@ -10,6 +10,7 @@ export const api = axios.create({
 })
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  if (config.data instanceof FormData) config.headers.delete('Content-Type')
   const token = localStorage.getItem(ACCESS_KEY)
   if (token) config.headers.Authorization = `Bearer ${token}`
   config.headers['X-Request-Id'] = crypto.randomUUID()
@@ -25,6 +26,8 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 function requestErrorMessage(error: AxiosError) {
   const status = error.response?.status
+  const serverMessage = (error.response?.data as { message?: string } | undefined)?.message
+  if (serverMessage) return serverMessage
   if (!status) return 'Не удалось связаться с сервером. Проверьте соединение и повторите попытку.'
   if (status === 400) return 'Запрос содержит некорректные данные. Проверьте введённую информацию.'
   if (status === 403) return 'Для этой операции недостаточно прав.'

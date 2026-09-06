@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import { LoadingView } from '../components/LoadingView'
 import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
+import { useAuth } from '../auth/AuthContext'
 import type { LearningPath } from '../types/api'
 
 function localizedReason(reason: string) {
@@ -14,21 +15,22 @@ function localizedReason(reason: string) {
 }
 
 export function LearningPathPage() {
+  const { user } = useAuth()
   const client = useQueryClient()
   const { data, isLoading } = useQuery({
-    queryKey: ['learning-path'],
+    queryKey: ['learning-path', user?.id],
     queryFn: async () => (await api.get<LearningPath>('/learning-paths/current')).data,
   })
 
   const rebuild = useMutation({
     mutationFn: async () => (await api.post<LearningPath>('/learning-paths/rebuild')).data,
-    onSuccess: (path) => client.setQueryData(['learning-path'], path),
+    onSuccess: (path) => client.setQueryData(['learning-path', user?.id], path),
   })
 
   const action = useMutation({
     mutationFn: async ({ stepId, kind }: { stepId: string; kind: 'complete' | 'skip' }) =>
       (await api.post<LearningPath>(`/learning-paths/steps/${stepId}/${kind}`)).data,
-    onSuccess: (path) => client.setQueryData(['learning-path'], path),
+    onSuccess: (path) => client.setQueryData(['learning-path', user?.id], path),
   })
 
   if (isLoading || !data) return <LoadingView />
@@ -41,7 +43,7 @@ export function LearningPathPage() {
         actions={<button className="secondary-button" onClick={() => rebuild.mutate()} disabled={rebuild.isPending}>Обновить план</button>}
       />
 
-      <div className="table-frame">
+      <div className="table-frame learning-path-frame">
         <table className="academic-table learning-path-table">
           <thead>
             <tr>

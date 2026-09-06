@@ -109,7 +109,7 @@ public sealed class StatisticsService : IStatisticsService
         if (cached is not null)
             return cached;
 
-        var users = await _uow.Users.WhereAsync(x => x.Role == UserRole.Student && x.IsActive, ct);
+        var users = await _uow.Users.WhereAsync(x => x.Role == UserRole.Student && x.IsActive && !x.Email.EndsWith("@probmind.test"), ct);
         var diagnostics = await _uow.DiagnosticSessions.ListAsync(ct);
         var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
         var topicStates = await _uow.TopicMasteries.ListAsync(ct);
@@ -152,7 +152,7 @@ public sealed class StatisticsService : IStatisticsService
         CancellationToken ct = default)
     {
         var students = await _uow.Users.WhereAsync(
-            x => x.Role == UserRole.Student && x.IsActive,
+            x => x.Role == UserRole.Student && x.IsActive && !x.Email.EndsWith("@probmind.test"),
             ct);
         var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
         var studentsWithResults = students.Count(user => answers.Any(answer => answer.UserId == user.Id));

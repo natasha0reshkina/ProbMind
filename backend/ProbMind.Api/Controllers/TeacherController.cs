@@ -29,6 +29,13 @@ public sealed class TeacherController : ControllerBase
         CancellationToken ct) =>
         _teacher.StudentMistakesAsync(studentId, limit <= 0 ? 50 : Math.Min(limit, 200), ct);
 
+    [HttpGet("students/{studentId:guid}/answer-notes")]
+    public Task<IReadOnlyList<StudentAnswerNoteDto>> StudentAnswerNotes(
+        Guid studentId,
+        [FromQuery] int limit,
+        CancellationToken ct) =>
+        _teacher.StudentAnswerNotesAsync(studentId, limit <= 0 ? 100 : Math.Min(limit, 300), ct);
+
     [HttpGet("questions/analytics")]
     public Task<IReadOnlyList<QuestionAnalyticsDto>> Questions(
         [FromQuery] Guid? topicId,

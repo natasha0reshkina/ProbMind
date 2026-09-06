@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { api } from '../api/client'
 import { PageHeader } from '../components/PageHeader'
+import { useAuth } from '../auth/AuthContext'
 import type { Dashboard, DiagnosticSession, TimelinePoint } from '../types/api'
 
 function formatSessionLabel(index: number, value?: string | null) {
@@ -13,12 +14,13 @@ function formatSessionLabel(index: number, value?: string | null) {
 }
 
 export function StatisticsPage() {
+  const { user } = useAuth()
   const dashboard = useQuery({
-    queryKey: ['dashboard'],
+    queryKey: ['dashboard', user?.id],
     queryFn: async () => (await api.get<Dashboard>('/statistics/dashboard')).data,
   })
   const diagnostics = useQuery({
-    queryKey: ['diagnostic-history-for-statistics'],
+    queryKey: ['diagnostic-history-for-statistics', user?.id],
     queryFn: async () => (await api.get<DiagnosticSession[]>('/diagnostics')).data,
   })
   const [topicId, setTopicId] = useState('')
@@ -26,7 +28,7 @@ export function StatisticsPage() {
   const topicsWithData = (dashboard.data?.topics ?? []).filter((topic) => topic.observationCount > 0)
   const selected = topicId || topicsWithData[0]?.topicId || ''
   const timeline = useQuery({
-    queryKey: ['mastery-timeline', selected],
+    queryKey: ['mastery-timeline', user?.id, selected],
     enabled: Boolean(selected),
     queryFn: async () => (await api.get<TimelinePoint[]>(`/statistics/mastery/${selected}/timeline`)).data,
   })

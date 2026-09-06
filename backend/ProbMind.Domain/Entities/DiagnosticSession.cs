@@ -13,4 +13,5 @@ public sealed class DiagnosticSession : Entity
     public DateTimeOffset? CompletedAt { get; set; }
     public double? OverallScore { get; set; }
     public string SelectionPolicyVersion { get; set; } = "adaptive-v2";
+    public Guid? DiagnosticTemplateId { get; set; }
 }

@@ -12,7 +12,7 @@ function topicStatus(value: number) {
   return 'Требует внимания'
 }
 
-export function DashboardPage() {
+export function DashboardPage({ embedded = false }: { embedded?: boolean }) {
   const query = useQuery({
     queryKey: ['dashboard'],
     queryFn: async () => (await api.get<Dashboard>('/statistics/dashboard')).data,
@@ -38,9 +38,9 @@ export function DashboardPage() {
 
   return (
     <div className="academic-page">
-      <header className="simple-page-header">
+      <header className={embedded ? 'cabinet-progress-header' : 'simple-page-header'}>
         <div>
-          <h1>Обзор</h1>
+          {embedded ? <h2>Учебный прогресс</h2> : <h1>Обзор</h1>}
           <p>Текущие результаты по курсу и рекомендации для повторения.</p>
         </div>
         {activeDiagnostic ? (

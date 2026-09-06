@@ -8,7 +8,7 @@ import { KpiStrip } from '../components/KpiStrip'
 import { PageHeader } from '../components/PageHeader'
 import { ProgressBar } from '../components/ProgressBar'
 import { StatusBadge, statusLabel } from '../components/StatusBadge'
-import type { PathStability, StudentMistake, StudentOverview } from '../types/api'
+import type { PathStability, StudentAnswerNote, StudentMistake, StudentOverview } from '../types/api'
 import { dateTime, percent } from '../utils/format'
 
 export function TeacherStudentDetailPage() {
@@ -26,6 +26,11 @@ export function TeacherStudentDetailPage() {
   const mistakes = useQuery({
     queryKey: ['teacher-student-mistakes', studentId],
     queryFn: async () => (await api.get<StudentMistake[]>(`/teacher/students/${studentId}/mistakes?limit=60`)).data,
+    enabled: Boolean(studentId),
+  })
+  const answerNotes = useQuery({
+    queryKey: ['teacher-student-answer-notes', studentId],
+    queryFn: async () => (await api.get<StudentAnswerNote[]>(`/teacher/students/${studentId}/answer-notes?limit=100`)).data,
     enabled: Boolean(studentId),
   })
 
@@ -51,6 +56,15 @@ export function TeacherStudentDetailPage() {
     groups[item.topicName] = current
     return groups
   }, {})).sort((a, b) => b.count - a.count)
+
+  const noteColumns: DataColumn<StudentAnswerNote>[] = [
+    { key: 'date', title: 'Дата', render: (row) => dateTime(row.submittedAt), sortValue: (row) => new Date(row.submittedAt).getTime() },
+    { key: 'source', title: 'Источник', render: (row) => row.source, sortValue: (row) => row.source },
+    { key: 'topic', title: 'Тема', render: (row) => <strong>{row.topicName}</strong>, sortValue: (row) => row.topicName },
+    { key: 'question', title: 'Задание', width: '30%', render: (row) => <span className="table-wrap-text">{row.prompt}</span>, sortValue: (row) => row.prompt },
+    { key: 'note', title: 'Комментарий студента', width: '30%', render: (row) => <span className="table-wrap-text teacher-student-note">{row.studentNote}</span>, sortValue: (row) => row.studentNote },
+    { key: 'result', title: 'Ответ', render: (row) => row.isCorrect ? 'Верно' : 'Неверно', sortValue: (row) => row.isCorrect ? 1 : 0 },
+  ]
 
   const mistakeColumns: DataColumn<StudentMistake>[] = [
     { key: 'date', title: 'Дата', render: (row) => dateTime(row.submittedAt), sortValue: (row) => new Date(row.submittedAt).getTime() },
@@ -161,6 +175,19 @@ export function TeacherStudentDetailPage() {
           </div>
         </section>
       )}
+
+      <section className="panel">
+        <div className="panel-title"><div><h2>Комментарии к решениям</h2><p className="muted chart-subtitle">Сообщения, которые студент оставил непосредственно при ответе на диагностические и практические задания.</p></div></div>
+        <DataTable
+          rows={answerNotes.data ?? []}
+          columns={noteColumns}
+          rowKey={(row) => row.id}
+          searchText={(row) => `${row.topicName} ${row.prompt} ${row.studentNote} ${row.source}`}
+          searchPlaceholder="Тема, задание или комментарий…"
+          pageSize={10}
+          emptyText="Студент пока не оставлял комментариев к решениям"
+        />
+      </section>
 
       <section className="panel">
         <div className="panel-title"><div><h2>Неверные ответы</h2><p className="muted chart-subtitle">Конкретные задания, в которых студент ошибся: выбранный ответ, правильный вариант и связанный тип затруднения.</p></div><ClipboardCheck size={20} /></div>

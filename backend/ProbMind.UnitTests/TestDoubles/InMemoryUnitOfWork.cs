@@ -31,6 +31,20 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork
     public InMemoryRepository<Notification> NotificationsStore { get; } = new();
     public InMemoryRepository<QuestionExposure> QuestionExposuresStore { get; } = new();
     public InMemoryRepository<DiagnosticReport> DiagnosticReportsStore { get; } = new();
+    public InMemoryRepository<StudyItem> StudyItemsStore { get; } = new();
+    public InMemoryRepository<StudyItemNote> StudyItemNotesStore { get; } = new();
+    public InMemoryRepository<DiagnosticTemplate> DiagnosticTemplatesStore { get; } = new();
+    public InMemoryRepository<DiagnosticTemplateQuestion> DiagnosticTemplateQuestionsStore { get; } = new();
+    public InMemoryRepository<GamificationSettings> GamificationSettingsStore { get; } = new();
+    public InMemoryRepository<SpacedReviewItem> SpacedReviewItemsStore { get; } = new();
+    public InMemoryRepository<StudentGroup> StudentGroupsStore { get; } = new();
+    public InMemoryRepository<StudentGroupMember> StudentGroupMembersStore { get; } = new();
+    public InMemoryRepository<TeacherIntervention> TeacherInterventionsStore { get; } = new();
+    public InMemoryRepository<ExamDefinition> ExamDefinitionsStore { get; } = new();
+    public InMemoryRepository<ExamAttempt> ExamAttemptsStore { get; } = new();
+    public InMemoryRepository<MaterialStudyCycle> MaterialStudyCyclesStore { get; } = new();
+    public InMemoryRepository<MaterialStudyProgress> MaterialStudyProgressStore { get; } = new();
+    public InMemoryRepository<StudentAchievement> StudentAchievementsStore { get; } = new();
 
     public IRepository<User> Users => UsersStore;
     public IRepository<RefreshToken> RefreshTokens => RefreshTokensStore;
@@ -58,6 +72,20 @@ public sealed class InMemoryUnitOfWork : IUnitOfWork
     public IRepository<Notification> Notifications => NotificationsStore;
     public IRepository<QuestionExposure> QuestionExposures => QuestionExposuresStore;
     public IRepository<DiagnosticReport> DiagnosticReports => DiagnosticReportsStore;
+    public IRepository<StudyItem> StudyItems => StudyItemsStore;
+    public IRepository<StudyItemNote> StudyItemNotes => StudyItemNotesStore;
+    public IRepository<DiagnosticTemplate> DiagnosticTemplates => DiagnosticTemplatesStore;
+    public IRepository<DiagnosticTemplateQuestion> DiagnosticTemplateQuestions => DiagnosticTemplateQuestionsStore;
+    public IRepository<GamificationSettings> GamificationSettings => GamificationSettingsStore;
+    public IRepository<SpacedReviewItem> SpacedReviewItems => SpacedReviewItemsStore;
+    public IRepository<StudentGroup> StudentGroups => StudentGroupsStore;
+    public IRepository<StudentGroupMember> StudentGroupMembers => StudentGroupMembersStore;
+    public IRepository<TeacherIntervention> TeacherInterventions => TeacherInterventionsStore;
+    public IRepository<ExamDefinition> ExamDefinitions => ExamDefinitionsStore;
+    public IRepository<ExamAttempt> ExamAttempts => ExamAttemptsStore;
+    public IRepository<MaterialStudyCycle> MaterialStudyCycles => MaterialStudyCyclesStore;
+    public IRepository<MaterialStudyProgress> MaterialStudyProgress => MaterialStudyProgressStore;
+    public IRepository<StudentAchievement> StudentAchievements => StudentAchievementsStore;
 
     public int SaveCalls { get; private set; }
 

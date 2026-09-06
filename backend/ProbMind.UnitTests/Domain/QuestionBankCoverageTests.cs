@@ -33,12 +33,15 @@ public sealed class QuestionBankCoverageTests
     {
         var questions = AllQuestions();
 
-        Assert.Equal(60, questions.Length);
-        Assert.Equal(60, questions.Select(x => x.Code).Distinct().Count());
+        Assert.Equal(540, questions.Length);
+        Assert.Equal(540, questions.Select(x => x.Code).Distinct().Count());
         Assert.Equal(ExpectedTopics.OrderBy(x => x).ToArray(), questions.Select(x => x.TopicCode).Distinct().OrderBy(x => x).ToArray());
 
         foreach (var topic in ExpectedTopics)
-            Assert.Equal(12, questions.Count(x => x.TopicCode == topic));
+        {
+            Assert.Equal(108, questions.Count(x => x.TopicCode == topic));
+            Assert.Equal(100, questions.Count(x => x.TopicCode == topic && x.Kind == QuestionKind.Diagnostic));
+        }
     }
 
     [Fact]
@@ -46,10 +49,10 @@ public sealed class QuestionBankCoverageTests
     {
         var questions = AllQuestions();
 
-        Assert.Equal(30, questions.Count(x => x.Kind == QuestionKind.Diagnostic));
-        Assert.Equal(15, questions.Count(x => x.Kind == QuestionKind.Corrective));
-        Assert.Equal(15, questions.Count(x => x.Kind == QuestionKind.Transfer));
-        Assert.Equal(15, questions.Count(x => x.IsTransfer));
+        Assert.Equal(500, questions.Count(x => x.Kind == QuestionKind.Diagnostic));
+        Assert.Equal(20, questions.Count(x => x.Kind == QuestionKind.Corrective));
+        Assert.Equal(20, questions.Count(x => x.Kind == QuestionKind.Transfer));
+        Assert.True(questions.Count(x => x.IsTransfer) >= 40);
     }
 
     [Fact]
@@ -60,7 +63,7 @@ public sealed class QuestionBankCoverageTests
         Assert.All(diagnostic, question =>
         {
             Assert.NotEmpty(question.TestedMisconceptionCodes);
-            Assert.Single(question.Options.Where(x => x.IsCorrect));
+            Assert.Single(question.Options, x => x.IsCorrect);
             Assert.All(
                 question.Options.Where(x => !x.IsCorrect),
                 option => Assert.False(string.IsNullOrWhiteSpace(option.MisconceptionCode)));
@@ -86,6 +89,8 @@ public sealed class QuestionBankCoverageTests
         .. IndependenceQuestionSeed.All,
         .. PValueQuestionSeed.All,
         .. LawLargeNumbersQuestionSeed.All,
-        .. RandomnessQuestionSeed.All
+        .. RandomnessQuestionSeed.All,
+        .. ExtendedQuestionSeed.All,
+        .. LargeQuestionBankSeed.All
     ];
 }

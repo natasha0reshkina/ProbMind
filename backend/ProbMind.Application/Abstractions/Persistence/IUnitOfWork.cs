@@ -30,6 +30,20 @@ public interface IUnitOfWork
     IRepository<Notification> Notifications { get; }
     IRepository<QuestionExposure> QuestionExposures { get; }
     IRepository<DiagnosticReport> DiagnosticReports { get; }
+    IRepository<StudyItem> StudyItems { get; }
+    IRepository<StudyItemNote> StudyItemNotes { get; }
+    IRepository<DiagnosticTemplate> DiagnosticTemplates { get; }
+    IRepository<DiagnosticTemplateQuestion> DiagnosticTemplateQuestions { get; }
+    IRepository<GamificationSettings> GamificationSettings { get; }
+    IRepository<SpacedReviewItem> SpacedReviewItems { get; }
+    IRepository<StudentGroup> StudentGroups { get; }
+    IRepository<StudentGroupMember> StudentGroupMembers { get; }
+    IRepository<TeacherIntervention> TeacherInterventions { get; }
+    IRepository<ExamDefinition> ExamDefinitions { get; }
+    IRepository<ExamAttempt> ExamAttempts { get; }
+    IRepository<MaterialStudyCycle> MaterialStudyCycles { get; }
+    IRepository<MaterialStudyProgress> MaterialStudyProgress { get; }
+    IRepository<StudentAchievement> StudentAchievements { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
