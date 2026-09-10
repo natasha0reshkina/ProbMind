@@ -581,7 +581,7 @@ export function TeacherDiagnosticBuilderPage() {
 
       <details className="panel diagnostic-csv-optional">
         <summary>Импортировать много задач из CSV</summary>
-        <p className="muted">Этот способ необязателен. Для нескольких задач удобнее использовать форму выше. CSV поддерживает разделитель «;» или «,».</p>
+        <p className="muted">Этот способ необязателен. Для нескольких задач удобнее использовать форму выше. CSV поддерживает разделитель ; или ,.</p>
         <p className="muted"><a href="/diagnostic_questions_template.csv" download>Скачать пример CSV для Excel</a></p>
         <div className="csv-upload-row">
           <input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />

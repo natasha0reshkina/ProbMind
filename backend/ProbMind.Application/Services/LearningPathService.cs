@@ -21,16 +21,14 @@ public sealed class LearningPathService : ILearningPathService
         _builder = builder;
     }
 
-    public async Task<LearningPathDto> GetCurrentAsync(Guid userId, CancellationToken ct = default)
+    public async Task<LearningPathDto?> GetCurrentAsync(Guid userId, CancellationToken ct = default)
     {
         var paths = await _uow.LearningPaths.WhereAsync(
             x => x.UserId == userId && x.Status == LearningPathStatus.Active,
             ct);
 
         var current = paths.OrderByDescending(x => x.Revision).FirstOrDefault();
-        return current is null
-            ? await RebuildAsync(userId, "Первичное построение плана повторения", ct)
-            : await MapAsync(current, ct);
+        return current is null ? null : await MapAsync(current, ct);
     }
 
     public async Task<LearningPathDto> RebuildAsync(

@@ -33,7 +33,7 @@ export function ContentManagerPage() {
     queryFn: async () => (await api.get<QuestionSummary[]>('/content/questions', { params: { ...(topicId ? { topicId } : {}), ...(status ? { status } : {}) } })).data,
   })
   const topicById = useMemo(() => new Map((topics.data ?? []).map((item) => [item.id, item])), [topics.data])
-  const rows = useMemo<QuestionRow[]>(() => (questions.data ?? []).map((q) => ({ ...q, topicName: topicById.get(q.topicId)?.nameRu ?? '—' })), [questions.data, topicById])
+  const rows = useMemo<QuestionRow[]>(() => (questions.data ?? []).map((q) => ({ ...q, topicName: topicById.get(q.topicId)?.nameRu ?? '-' })), [questions.data, topicById])
 
   const mutateStatus = useMutation({
     mutationFn: async ({ id, action }: { id: string; action: 'publish' | 'archive' }) => (await api.post<QuestionDetail>(`/content/questions/${id}/${action}`)).data,

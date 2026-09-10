@@ -37,7 +37,7 @@ export function TeacherExamReviewPage() {
         <Link className="ghost-button" to="/teacher/exams">← К экзаменам</Link>
         <div className={`exam-review-completion ${data.allCompleted ? 'exam-review-completion--ready' : ''}`}>
           <strong>{data.completedStudents} / {data.assignedStudents}</strong>
-          <span>{data.allCompleted ? 'Все завершили — ответы открыты' : 'Завершили экзамен'}</span>
+          <span>{data.allCompleted ? 'Все завершили - ответы открыты' : 'Завершили экзамен'}</span>
         </div>
       </div>
 
@@ -89,8 +89,8 @@ export function TeacherExamReviewPage() {
                     <dl className="exam-answer-details">
                       <div><dt>Ответ студента</dt><dd>{answer.selectedAnswer ?? 'Нет ответа'}</dd></div>
                       <div><dt>Правильный ответ</dt><dd>{answer.correctAnswer}</dd></div>
-                      <div><dt>Уверенность</dt><dd>{answer.confidenceLevel ? confidenceLabels[answer.confidenceLevel] ?? '—' : 'Не указана'}</dd></div>
-                      <div><dt>Время ответа</dt><dd>{answer.responseTimeMs != null ? `${Math.max(0, Math.round(answer.responseTimeMs / 1000))} сек.` : '—'}</dd></div>
+                      <div><dt>Уверенность</dt><dd>{answer.confidenceLevel ? confidenceLabels[answer.confidenceLevel] ?? '-' : 'Не указана'}</dd></div>
+                      <div><dt>Время ответа</dt><dd>{answer.responseTimeMs != null ? `${Math.max(0, Math.round(answer.responseTimeMs / 1000))} сек.` : '-'}</dd></div>
                     </dl>
                     {answer.reasoning ? <div className="exam-answer-note"><strong>Ход рассуждения</strong><p>{answer.reasoning}</p></div> : null}
                     {answer.studentNote ? <div className="exam-answer-note"><strong>Комментарий преподавателю</strong><p>{answer.studentNote}</p></div> : null}

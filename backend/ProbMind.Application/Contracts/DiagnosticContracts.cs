@@ -10,7 +10,8 @@ public sealed record DiagnosticSessionDto(
     int AnsweredQuestionCount,
     DateTimeOffset? StartedAt,
     DateTimeOffset? CompletedAt,
-    double? OverallScore);
+    double? OverallScore,
+    Guid? DiagnosticTemplateId);
 
 public sealed record AnswerOptionDto(Guid Id, string Text, int SortOrder);
 public sealed record DiagnosticQuestionDto(
@@ -35,9 +36,10 @@ public sealed record SubmitDiagnosticAnswerRequest(
     string? Reasoning = null);
 
 public sealed record AnswerFeedbackDto(
-    bool IsCorrect,
-    string Feedback,
-    string CorrectExplanation,
+    bool FeedbackAvailable,
+    bool? IsCorrect,
+    string? Feedback,
+    string? CorrectExplanation,
     string? SuspectedMisconceptionCode,
     double? UpdatedConfidence,
     MisconceptionStatus? UpdatedStatus);

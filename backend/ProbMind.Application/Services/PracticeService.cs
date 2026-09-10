@@ -41,6 +41,9 @@ public sealed class PracticeService : IPracticeService
     {
         Guard.Range(request.TargetExercises, 3, 12, "targetExercises");
 
+        if (await ExamSessionRules.ActiveAttemptAsync(_uow, userId, ct) is not null)
+            throw new InvalidOperationException("Во время активного экзамена нельзя начинать практику.");
+
         _ = await _uow.Topics.GetByIdAsync(request.TopicId, ct)
             ?? throw new KeyNotFoundException("Topic not found.");
 
@@ -172,6 +175,14 @@ public sealed class PracticeService : IPracticeService
         if (session.Status != PracticeStatus.InProgress)
             throw new InvalidOperationException("Practice session is not in progress.");
 
+        if (session.CompletedExercises >= session.TargetExercises)
+            throw new InvalidOperationException("Лимит ответов для этой тренировки исчерпан.");
+
+        var expected = await NextQuestionAsync(userId, session.Id, ct)
+            ?? throw new InvalidOperationException("Для этой тренировки больше нет доступных заданий.");
+        if (expected.QuestionId != request.QuestionId || expected.VersionId != request.QuestionVersionId)
+            throw new InvalidOperationException("Этот вопрос или его версия не назначены текущей тренировке.");
+
         var duplicate = await _uow.PracticeAttempts.AnyAsync(
             x => x.PracticeSessionId == session.Id && x.QuestionId == request.QuestionId,
             ct);
@@ -195,6 +206,13 @@ public sealed class PracticeService : IPracticeService
             option.QuestionVersionId != version.Id)
             throw new InvalidOperationException("Practice answer references inconsistent content.");
 
+        var isTransferQuestion = question.Kind == QuestionKind.Transfer || version.IsTransferQuestion;
+        var effectiveExerciseType = isTransferQuestion
+            ? ExerciseType.Transfer
+            : request.ExerciseType == ExerciseType.Transfer
+                ? ExerciseType.IndependentPractice
+                : request.ExerciseType;
+
         var attempt = new PracticeAttempt
         {
             PracticeSessionId = session.Id,
@@ -202,7 +220,7 @@ public sealed class PracticeService : IPracticeService
             QuestionId = question.Id,
             QuestionVersionId = version.Id,
             AnswerOptionId = option.Id,
-            ExerciseType = request.ExerciseType,
+            ExerciseType = effectiveExerciseType,
             IsCorrect = option.IsCorrect,
             ResponseTimeMs = Math.Max(0, request.ResponseTimeMs),
             StudentNote = string.IsNullOrWhiteSpace(request.StudentNote) ? null : request.StudentNote.Trim(),
@@ -216,7 +234,7 @@ public sealed class PracticeService : IPracticeService
         Guid? affected = session.MisconceptionId ?? option.MisconceptionId;
         if (affected.HasValue)
         {
-            var (kind, weight) = ResolveEvidence(request.ExerciseType, option.IsCorrect);
+            var (kind, weight) = ResolveEvidence(effectiveExerciseType, option.IsCorrect);
             await _uow.MisconceptionEvidence.AddAsync(new MisconceptionEvidence
             {
                 UserId = userId,
@@ -226,8 +244,8 @@ public sealed class PracticeService : IPracticeService
                 RawWeight = weight,
                 RelevanceWeight = 1d,
                 Explanation = option.IsCorrect
-                    ? "Правильный ответ в коррекционной практике снижает уверенность в исходном заблуждении."
-                    : "Ошибка в коррекционной практике дополнительно подтверждает исходный паттерн.",
+                    ? "Правильный ответ снижает вероятность повторения выбранной ошибки."
+                    : "Ошибка повторилась в коррекционной практике.",
                 ObservedAt = _clock.UtcNow
             }, ct);
         }
@@ -259,6 +277,7 @@ public sealed class PracticeService : IPracticeService
         }
 
         return new AnswerFeedbackDto(
+            true,
             option.IsCorrect,
             option.Feedback,
             version.CorrectExplanation,
@@ -307,7 +326,8 @@ public sealed class PracticeService : IPracticeService
         await _uow.SaveChangesAsync(ct);
         await _learner.RecalculateAllAsync(userId, ct);
         await _recommendations.RebuildAsync(userId, ct);
-        await _paths.RebuildAsync(userId, "Завершена коррекционная практика", ct);
+        await _paths.RebuildAsync(userId, "Завершена практика", ct);
+        await UpdateSpacedReviewAfterPracticeAsync(session, attempts, ct);
 
         return await BuildResultAsync(session, ct);
     }
@@ -317,9 +337,29 @@ public sealed class PracticeService : IPracticeService
         CancellationToken ct = default)
     {
         var sessions = await _uow.PracticeSessions.WhereAsync(x => x.UserId == userId, ct);
+        var sessionIds = sessions.Select(x => x.Id).ToHashSet();
+        var attempts = (await _uow.PracticeAttempts.WhereAsync(x => x.UserId == userId, ct))
+            .Where(x => sessionIds.Contains(x.PracticeSessionId))
+            .GroupBy(x => x.PracticeSessionId)
+            .ToDictionary(x => x.Key, x => x.ToArray());
+
         return sessions
             .OrderByDescending(x => x.CreatedAt)
-            .Select(Map)
+            .Select(session =>
+            {
+                var rows = attempts.GetValueOrDefault(session.Id) ?? Array.Empty<PracticeAttempt>();
+                return new PracticeSessionDto(
+                    session.Id,
+                    session.TopicId,
+                    session.MisconceptionId,
+                    session.Status,
+                    session.TargetExercises,
+                    session.CompletedExercises,
+                    session.StartedAt,
+                    session.CompletedAt,
+                    rows.Count(x => x.IsCorrect),
+                    rows.Count(x => !x.IsCorrect));
+            })
             .ToArray();
     }
 
@@ -350,6 +390,51 @@ public sealed class PracticeService : IPracticeService
             state?.Confidence,
             state?.Status,
             path);
+    }
+
+    private async Task UpdateSpacedReviewAfterPracticeAsync(
+        PracticeSession session,
+        IReadOnlyList<PracticeAttempt> attempts,
+        CancellationToken ct)
+    {
+        var records = await _uow.SpacedReviewItems.WhereAsync(
+            x => x.UserId == session.UserId && x.TopicId == session.TopicId,
+            ct);
+        var item = records.SingleOrDefault() ?? new SpacedReviewItem
+        {
+            UserId = session.UserId,
+            TopicId = session.TopicId
+        };
+
+        var accuracy = attempts.Count == 0 ? 0d : attempts.Count(x => x.IsCorrect) / (double)attempts.Count;
+        if (accuracy < .6d)
+        {
+            item.Repetitions = 0;
+            item.IntervalDays = 0;
+            item.EaseFactor = Math.Max(1.3d, item.EaseFactor - .2d);
+        }
+        else
+        {
+            item.Repetitions++;
+            item.IntervalDays = item.Repetitions switch
+            {
+                1 => 1,
+                2 => 3,
+                3 => 7,
+                _ => Math.Max(7, (int)Math.Round(item.IntervalDays * item.EaseFactor))
+            };
+            if (accuracy >= .85d)
+                item.EaseFactor = Math.Min(3d, item.EaseFactor + .1d);
+        }
+
+        item.LastReviewedAt = _clock.UtcNow;
+        item.NextReviewAt = _clock.UtcNow.AddDays(item.IntervalDays);
+        item.Touch();
+        if (records.Count == 0)
+            await _uow.SpacedReviewItems.AddAsync(item, ct);
+        else
+            _uow.SpacedReviewItems.Update(item);
+        await _uow.SaveChangesAsync(ct);
     }
 
     private async Task<PracticeSession> GetOwnedAsync(Guid userId, Guid sessionId, CancellationToken ct)

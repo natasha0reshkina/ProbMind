@@ -11,7 +11,7 @@ import type { AuditLog } from '../types/api'
 import { dateTime } from '../utils/format'
 
 function prettyJson(value: string) {
-  if (!value) return '—'
+  if (!value) return '-'
   try { return JSON.stringify(JSON.parse(value), null, 2) } catch { return value }
 }
 
@@ -31,9 +31,9 @@ export function AuditLogPage() {
   const columns: DataColumn<AuditLog>[] = useMemo(() => [
     { key: 'time', title: 'Время', render: (row) => dateTime(row.createdAt), sortValue: (row) => new Date(row.createdAt).getTime(), width: '170px' },
     { key: 'action', title: 'Действие', render: (row) => <StatusBadge value={row.action} />, sortValue: (row) => row.action },
-    { key: 'entity', title: 'Сущность', render: (row) => <div><strong>{row.entityType}</strong><span className="table-secondary mono-small">{row.entityId ?? '—'}</span></div>, sortValue: (row) => row.entityType },
+    { key: 'entity', title: 'Сущность', render: (row) => <div><strong>{row.entityType}</strong><span className="table-secondary mono-small">{row.entityId ?? '-'}</span></div>, sortValue: (row) => row.entityType },
     { key: 'actor', title: 'Инициатор', render: (row) => <code>{row.actorUserId?.slice(0, 8) ?? 'система'}</code>, sortValue: (row) => row.actorUserId ?? '' },
-    { key: 'request', title: 'ID запроса', render: (row) => <code>{row.requestId?.slice(0, 12) || '—'}</code>, sortValue: (row) => row.requestId },
+    { key: 'request', title: 'ID запроса', render: (row) => <code>{row.requestId?.slice(0, 12) || '-'}</code>, sortValue: (row) => row.requestId },
     { key: 'details', title: '', render: (row) => <button className="ghost-button small" onClick={(event) => { event.stopPropagation(); setSelected(row) }}><FileJson size={14} /> JSON</button> },
   ], [])
 
@@ -83,8 +83,8 @@ export function AuditLogPage() {
         </div>
         <div className="audit-meta-grid">
           <div><span>Инициатор</span><code>{selected?.actorUserId ?? 'система'}</code></div>
-          <div><span>ID объекта</span><code>{selected?.entityId ?? '—'}</code></div>
-          <div><span>ID запроса</span><code>{selected?.requestId ?? '—'}</code></div>
+          <div><span>ID объекта</span><code>{selected?.entityId ?? '-'}</code></div>
+          <div><span>ID запроса</span><code>{selected?.requestId ?? '-'}</code></div>
         </div>
       </Modal>
     </div>

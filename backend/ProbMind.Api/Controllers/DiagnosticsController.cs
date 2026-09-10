@@ -42,4 +42,8 @@ public sealed class DiagnosticsController : ControllerBase
     [HttpGet("{sessionId:guid}/report")]
     public Task<DiagnosticReportDto> Report(Guid sessionId, CancellationToken ct) =>
         _diagnostics.ReportAsync(UserContext.UserId(User), sessionId, ct);
+
+    [HttpPost("{sessionId:guid}/cancel")]
+    public Task<DiagnosticSessionDto> Cancel(Guid sessionId, CancellationToken ct) =>
+        _diagnostics.CancelAsync(UserContext.UserId(User), sessionId, ct);
 }

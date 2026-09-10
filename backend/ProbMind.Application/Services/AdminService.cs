@@ -12,12 +12,24 @@ public sealed class AdminService : IAdminService
 
     public AdminService(IUnitOfWork uow) => _uow = uow;
 
-    public async Task<IReadOnlyList<AdminUserDto>> ListUsersAsync(CancellationToken ct = default) =>
-        (await _uow.Users.ListAsync(ct))
+    public async Task<IReadOnlyList<AdminUserDto>> ListUsersAsync(CancellationToken ct = default)
+    {
+        var users = (await _uow.Users.ListAsync(ct))
             .Where(x => !x.Email.EndsWith("@probmind.test", StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(x => x.CreatedAt)
-            .Select(Map)
             .ToArray();
+        var groups = (await _uow.StudentGroups.ListAsync(ct)).ToDictionary(x => x.Id, x => x.Name);
+        var memberships = await _uow.StudentGroupMembers.ListAsync(ct);
+
+        return users
+            .Select(user => Map(user, memberships
+                .Where(x => x.StudentId == user.Id && groups.ContainsKey(x.GroupId))
+                .Select(x => groups[x.GroupId])
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x)
+                .ToArray()))
+            .ToArray();
+    }
 
     public async Task<AdminUserDto> SetRoleAsync(
         Guid actorId,
@@ -43,7 +55,7 @@ public sealed class AdminService : IAdminService
         }, ct);
 
         await _uow.SaveChangesAsync(ct);
-        return Map(user);
+        return Map(user, await GroupNamesAsync(user.Id, ct));
     }
 
     public async Task<AdminUserDto> SetActiveAsync(
@@ -73,7 +85,7 @@ public sealed class AdminService : IAdminService
         }, ct);
 
         await _uow.SaveChangesAsync(ct);
-        return Map(user);
+        return Map(user, await GroupNamesAsync(user.Id, ct));
     }
 
     public async Task<IReadOnlyList<AuditLogDto>> AuditAsync(int take, CancellationToken ct = default)
@@ -88,6 +100,19 @@ public sealed class AdminService : IAdminService
             .ToArray();
     }
 
-    private static AdminUserDto Map(User x) =>
-        new(x.Id, x.Email, x.DisplayName, x.Role, x.IsActive, x.LastLoginAt, x.CreatedAt);
+    private async Task<IReadOnlyList<string>> GroupNamesAsync(Guid userId, CancellationToken ct)
+    {
+        var memberships = await _uow.StudentGroupMembers.WhereAsync(x => x.StudentId == userId, ct);
+        if (memberships.Count == 0) return Array.Empty<string>();
+        var ids = memberships.Select(x => x.GroupId).ToHashSet();
+        return (await _uow.StudentGroups.ListAsync(ct))
+            .Where(x => ids.Contains(x.Id))
+            .Select(x => x.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToArray();
+    }
+
+    private static AdminUserDto Map(User x, IReadOnlyList<string> groupNames) =>
+        new(x.Id, x.Email, x.DisplayName, x.Role, x.IsActive, x.LastLoginAt, x.CreatedAt, groupNames);
 }

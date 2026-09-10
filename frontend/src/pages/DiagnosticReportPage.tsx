@@ -43,8 +43,8 @@ export function DiagnosticReportPage() {
           <small>{data.correct} из {data.answered} правильных ответов</small>
         </div>
         <div className="diagnostic-report-summary">
-          <p>Лучше всего освоена тема «{strongest?.name ?? '—'}»{strongest ? ` (${Math.round(strongest.mastery * 100)}%)` : ''}.</p>
-          <p>В первую очередь стоит повторить тему «{weakest?.name ?? '—'}»{weakest ? ` (${Math.round(weakest.mastery * 100)}%)` : ''}.</p>
+          <p>Лучше всего освоена тема {strongest?.name ?? '-'}{strongest ? ` (${Math.round(strongest.mastery * 100)}%)` : ''}.</p>
+          <p>В первую очередь стоит повторить тему {weakest?.name ?? '-'}{weakest ? ` (${Math.round(weakest.mastery * 100)}%)` : ''}.</p>
         </div>
       </section>
 
@@ -52,9 +52,9 @@ export function DiagnosticReportPage() {
         <h2>Краткая сводка</h2>
         <dl className="summary-list diagnostic-report-summary-list">
           <div><dt>Правильные ответы</dt><dd>{data.correct} из {data.answered}</dd></div>
-          <div><dt>Сильная тема</dt><dd>{strongest?.name ?? '—'}</dd></div>
-          <div><dt>Тема для повторения</dt><dd>{weakest?.name ?? '—'}</dd></div>
-          <div><dt>Выявлено типичных ошибок</dt><dd>{visibleMisconceptions.length}</dd></div>
+          <div><dt>Сильная тема</dt><dd>{strongest?.name ?? '-'}</dd></div>
+          <div><dt>Тема для повторения</dt><dd>{weakest?.name ?? '-'}</dd></div>
+          <div><dt>Выявлено типичных затруднений</dt><dd>{visibleMisconceptions.length}</dd></div>
         </dl>
       </section>
 
@@ -76,10 +76,10 @@ export function DiagnosticReportPage() {
         </section>
 
         <section className="panel">
-          <h2>Выявленные типичные ошибки</h2>
+          <h2>Выявленные типичные затруднения</h2>
           {visibleMisconceptions.length === 0 ? (
             <EmptyState
-              title="Выраженных типичных ошибок не выявлено"
+              title="Выраженных типичных затруднений не выявлено"
               description="В этой диагностике нет ошибок, которые требуют отдельного разбора."
             />
           ) : (

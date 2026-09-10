@@ -4,12 +4,27 @@ import { api } from '../api/client'
 import { ErrorView } from '../components/ErrorView'
 import { LoadingView } from '../components/LoadingView'
 import type { Dashboard, DiagnosticSession, PracticeSession } from '../types/api'
+import { cleanUiText } from '../utils/format'
 
 function topicStatus(value: number) {
   if (value >= 0.8) return 'Освоено'
   if (value >= 0.65) return 'Стабильно'
   if (value >= 0.5) return 'Нужно повторить'
   return 'Требует внимания'
+}
+
+
+function recommendationTitle(value: string) {
+  return cleanUiText(value)
+    .replace('Исправьте заблуждение:', 'Разберите ошибку:')
+    .replace('Перепроверьте:', 'Проверьте ещё раз:')
+    .replace('Повторите тему ', 'Повторите тему: ')
+}
+
+function recommendationRationale(value: string) {
+  return cleanUiText(value)
+    .replace('Паттерн ошибки подтверждён предыдущими ответами. Диагностическая уверенность - ', 'Ошибка повторялась в предыдущих ответах. Уровень подтверждения: ')
+    .replace('Текущий уровень освоения:', 'Освоение темы:')
 }
 
 export function DashboardPage({ embedded = false }: { embedded?: boolean }) {
@@ -41,7 +56,6 @@ export function DashboardPage({ embedded = false }: { embedded?: boolean }) {
       <header className={embedded ? 'cabinet-progress-header' : 'simple-page-header'}>
         <div>
           {embedded ? <h2>Учебный прогресс</h2> : <h1>Обзор</h1>}
-          <p>Текущие результаты по курсу и рекомендации для повторения.</p>
         </div>
         {activeDiagnostic ? (
           <Link className="primary-button" to={`/diagnostics/${activeDiagnostic.id}/continue`}>Продолжить диагностику</Link>
@@ -80,18 +94,15 @@ export function DashboardPage({ embedded = false }: { embedded?: boolean }) {
         <h2>Краткая сводка</h2>
         <dl className="summary-list">
           <div><dt>Общий уровень освоения</dt><dd>{hasObservations ? `${Math.round(data.overallMastery * 100)}%` : 'Нет данных'}</dd></div>
-          <div><dt>Типичных ошибок требуют внимания</dt><dd>{data.activeMisconceptions}</dd></div>
-          <div><dt>Исправлено типичных ошибок</dt><dd>{data.correctedMisconceptions}</dd></div>
+          <div><dt>Типичных затруднений требуют внимания</dt><dd>{data.activeMisconceptions}</dd></div>
+          <div><dt>Исправлено типичных затруднений</dt><dd>{data.correctedMisconceptions}</dd></div>
           <div><dt>Завершено диагностик</dt><dd>{data.completedDiagnostics}</dd></div>
         </dl>
       </section>
 
       <section className="plain-section">
         <div className="section-heading-row">
-          <div>
-            <h2>Темы курса</h2>
-            <p>Уровень рассчитывается по результатам диагностики и практики.</p>
-          </div>
+          <h2>Темы курса</h2>
           <Link to="/statistics">Подробная статистика</Link>
         </div>
         <div className="table-frame">
@@ -109,7 +120,7 @@ export function DashboardPage({ embedded = false }: { embedded?: boolean }) {
                 <tr key={topic.topicId}>
                   <td><strong>{topic.name}</strong></td>
                   <td>{topic.observationCount}</td>
-                  <td className="numeric-cell">{topic.observationCount > 0 ? `${Math.round(topic.mastery * 100)}%` : '—'}</td>
+                  <td className="numeric-cell">{topic.observationCount > 0 ? `${Math.round(topic.mastery * 100)}%` : '-'}</td>
                   <td>{topic.observationCount > 0 ? <span className={`text-status text-status--${topicStatus(topic.mastery).replaceAll(' ', '-').toLowerCase()}`}>{topicStatus(topic.mastery)}</span> : <span className="muted">Нет данных</span>}</td>
                 </tr>
               ))}
@@ -125,8 +136,8 @@ export function DashboardPage({ embedded = false }: { embedded?: boolean }) {
             {data.recommendations.map((item) => (
               <li key={item.id}>
                 <div>
-                  <strong>{item.title}</strong>
-                  <p>{item.rationale}</p>
+                  <strong>{recommendationTitle(item.title)}</strong>
+                  <p>{recommendationRationale(item.rationale)}</p>
                   <Link
                     to={item.misconceptionId
                       ? `/practice?misconception=${item.misconceptionId}`
@@ -134,7 +145,7 @@ export function DashboardPage({ embedded = false }: { embedded?: boolean }) {
                         ? `/practice?topic=${item.topicId}`
                         : '/diagnostic'}
                   >
-                    Перейти к следующему шагу
+                    Открыть практику
                   </Link>
                 </div>
                 <span>приоритет {Math.round(item.priority * 100)}%</span>

@@ -55,6 +55,7 @@ export interface Dashboard {
 
 export interface DiagnosticSession {
   id: string
+  diagnosticTemplateId?: string | null
   status: DiagnosticStatus
   plannedQuestionCount: number
   answeredQuestionCount: number
@@ -82,9 +83,10 @@ export interface DiagnosticQuestion {
 }
 
 export interface AnswerFeedback {
-  isCorrect: boolean
-  feedback: string
-  correctExplanation: string
+  feedbackAvailable: boolean
+  isCorrect?: boolean | null
+  feedback?: string | null
+  correctExplanation?: string | null
   suspectedMisconceptionCode?: string | null
   updatedConfidence?: number | null
   updatedStatus?: MisconceptionStatus | null
@@ -203,6 +205,8 @@ export interface PracticeSession {
   completedExercises: number
   startedAt?: string | null
   completedAt?: string | null
+  correctAnswers?: number
+  incorrectAnswers?: number
 }
 
 export interface PracticeResult {
@@ -280,6 +284,7 @@ export interface AdminUser {
   isActive: boolean
   lastLoginAt?: string | null
   createdAt: string
+  groupNames: string[]
 }
 
 export interface StudentListItem {
@@ -294,6 +299,7 @@ export interface StudentListItem {
   diagnosticAccuracy: number
   activeMisconceptionTitles: string[]
   lastActivityAt?: string | null
+  groupNames: string[]
 }
 
 export interface StudentMistake {
@@ -317,6 +323,7 @@ export interface StudentOverview {
   completedDiagnostics: number
   completedPracticeSessions: number
   lastActivityAt?: string | null
+  groupNames: string[]
   topics: TopicProgress[]
   misconceptions: UserMisconception[]
 }
@@ -676,7 +683,7 @@ export interface SpacedReview {
   topicCode: string
   topicName: string
   mastery: number
-  nextReviewAt: string
+  nextReviewAt: string | null
   lastReviewedAt?: string | null
   intervalDays: number
   repetitions: number

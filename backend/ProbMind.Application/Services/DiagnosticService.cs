@@ -48,7 +48,11 @@ public sealed class DiagnosticService : IDiagnosticService
     {
         var count = Guard.Range(request.QuestionCount, 10, 30, "questionCount");
 
-        var resumable = await NormalizeActiveSessionAsync(userId, ct);
+        var activeExam = await ExamSessionRules.ActiveAttemptAsync(_uow, userId, ct);
+        if (activeExam is not null)
+            throw new InvalidOperationException("Сначала завершите активный экзамен.");
+
+        var resumable = await FindActiveSessionAsync(userId, ct);
         if (resumable is not null)
             return Map(resumable);
 
@@ -91,6 +95,10 @@ public sealed class DiagnosticService : IDiagnosticService
             !await _uow.StudentGroupMembers.AnyAsync(x => x.GroupId == template.GroupId.Value && x.StudentId == userId, ct))
             throw new UnauthorizedAccessException("Эта диагностика назначена другой группе.");
 
+        var activeExam = await ExamSessionRules.ActiveAttemptAsync(_uow, userId, ct);
+        if (activeExam is not null)
+            throw new InvalidOperationException("Сначала завершите активный экзамен.");
+
         var active = await _uow.DiagnosticSessions.WhereAsync(
             x => x.UserId == userId &&
                  (x.Status == DiagnosticStatus.Created || x.Status == DiagnosticStatus.InProgress),
@@ -105,16 +113,7 @@ public sealed class DiagnosticService : IDiagnosticService
             return Map(sameTemplate);
 
         if (active.Count > 0)
-        {
-            foreach (var previous in active)
-            {
-                previous.Status = DiagnosticStatus.Cancelled;
-                previous.CompletedAt ??= _clock.UtcNow;
-                previous.Touch();
-                _uow.DiagnosticSessions.Update(previous);
-            }
-            await _uow.SaveChangesAsync(ct);
-        }
+            throw new InvalidOperationException("Сначала завершите или отмените текущую диагностику.");
 
         var templateQuestions = await _uow.DiagnosticTemplateQuestions.WhereAsync(
             x => x.DiagnosticTemplateId == templateId,
@@ -151,8 +150,6 @@ public sealed class DiagnosticService : IDiagnosticService
         Guid userId,
         CancellationToken ct = default)
     {
-        await NormalizeActiveSessionAsync(userId, ct);
-
         var sessions = await _uow.DiagnosticSessions.WhereAsync(x => x.UserId == userId, ct);
         return sessions
             .OrderByDescending(x => x.CreatedAt)
@@ -166,13 +163,6 @@ public sealed class DiagnosticService : IDiagnosticService
         CancellationToken ct = default)
     {
         var requested = await GetOwnedSessionAsync(userId, sessionId, ct);
-        if (requested.Status is DiagnosticStatus.Created or DiagnosticStatus.InProgress)
-        {
-            var canonical = await NormalizeActiveSessionAsync(userId, ct);
-            if (canonical is not null)
-                return Map(canonical);
-        }
-
         return Map(requested);
     }
 
@@ -391,6 +381,16 @@ public sealed class DiagnosticService : IDiagnosticService
         if (await IsExpiredExamSessionAsync(session.Id, ct))
             throw new InvalidOperationException("Время экзамена истекло. Завершите экзамен и откройте итоговый отчёт.");
 
+        if (session.AnsweredQuestionCount >= session.PlannedQuestionCount)
+            throw new InvalidOperationException("Лимит ответов для этой попытки исчерпан.");
+
+        var expected = await NextQuestionAsync(userId, session.Id, ct)
+            ?? throw new InvalidOperationException("Для этой попытки больше нет доступных заданий.");
+        if (expected.QuestionId != request.QuestionId || expected.VersionId != request.QuestionVersionId)
+            throw new InvalidOperationException("Этот вопрос или его версия не назначены текущей попытке.");
+
+        var isExamSession = await ExamSessionRules.IsExamSessionAsync(_uow, session.Id, ct);
+
         var duplicate = await _uow.DiagnosticAnswers.AnyAsync(
             x => x.SessionId == request.SessionId && x.QuestionId == request.QuestionId,
             ct);
@@ -437,36 +437,39 @@ public sealed class DiagnosticService : IDiagnosticService
 
         Guid? affectedMisconceptionId = null;
 
-        if (!option.IsCorrect && option.MisconceptionId.HasValue)
+        if (!isExamSession)
         {
-            affectedMisconceptionId = option.MisconceptionId.Value;
-            await AddEvidenceAsync(
-                userId,
-                option.MisconceptionId.Value,
-                answer.Id,
-                EvidenceKind.Distractor,
-                1d,
-                option.Feedback,
-                ct);
-        }
-        else if (option.IsCorrect)
-        {
-            var tested = await _uow.QuestionMisconceptionMaps.WhereAsync(
-                x => x.QuestionId == question.Id && x.CanDisconfirm,
-                ct);
-
-            foreach (var map in tested)
+            if (!option.IsCorrect && option.MisconceptionId.HasValue)
             {
-                affectedMisconceptionId ??= map.MisconceptionId;
+                affectedMisconceptionId = option.MisconceptionId.Value;
                 await AddEvidenceAsync(
                     userId,
-                    map.MisconceptionId,
+                    option.MisconceptionId.Value,
                     answer.Id,
-                    version.IsTransferQuestion ? EvidenceKind.TransferSuccess : EvidenceKind.CorrectAnswer,
-                    version.IsTransferQuestion ? -1.15d : -0.55d,
-                    "Правильный ответ снижает уверенность в наличии связанного заблуждения.",
-                    ct,
-                    map.RelevanceWeight);
+                    EvidenceKind.Distractor,
+                    1d,
+                    option.Feedback,
+                    ct);
+            }
+            else if (option.IsCorrect)
+            {
+                var tested = await _uow.QuestionMisconceptionMaps.WhereAsync(
+                    x => x.QuestionId == question.Id && x.CanDisconfirm,
+                    ct);
+
+                foreach (var map in tested)
+                {
+                    affectedMisconceptionId ??= map.MisconceptionId;
+                    await AddEvidenceAsync(
+                        userId,
+                        map.MisconceptionId,
+                        answer.Id,
+                        version.IsTransferQuestion ? EvidenceKind.TransferSuccess : EvidenceKind.CorrectAnswer,
+                        version.IsTransferQuestion ? -1.15d : -0.55d,
+                        "Правильный ответ снижает вероятность связанной типичной ошибки.",
+                        ct,
+                        map.RelevanceWeight);
+                }
             }
         }
 
@@ -474,7 +477,8 @@ public sealed class DiagnosticService : IDiagnosticService
         session.Touch();
         _uow.DiagnosticSessions.Update(session);
 
-        await RegisterExposureAsync(userId, question.Id, option.IsCorrect, ct);
+        if (!isExamSession)
+            await RegisterExposureAsync(userId, question.Id, option.IsCorrect, ct);
 
         await _uow.ActivityEvents.AddAsync(new ActivityEvent
         {
@@ -482,16 +486,26 @@ public sealed class DiagnosticService : IDiagnosticService
             EventType = ActivityEventType.AnswerSubmitted,
             AggregateType = nameof(DiagnosticSession),
             AggregateId = session.Id,
-            PayloadJson = JsonSerializer.Serialize(new
-            {
-                questionId = question.Id,
-                answerOptionId = option.Id,
-                correct = option.IsCorrect,
-                responseTimeMs = answer.ResponseTimeMs
-            })
+            PayloadJson = isExamSession
+                ? JsonSerializer.Serialize(new
+                {
+                    questionId = question.Id,
+                    answerOptionId = option.Id,
+                    responseTimeMs = answer.ResponseTimeMs
+                })
+                : JsonSerializer.Serialize(new
+                {
+                    questionId = question.Id,
+                    answerOptionId = option.Id,
+                    correct = option.IsCorrect,
+                    responseTimeMs = answer.ResponseTimeMs
+                })
         }, ct);
 
         await _uow.SaveChangesAsync(ct);
+
+        if (isExamSession)
+            return new AnswerFeedbackDto(false, null, null, null, null, null, null);
 
         if (affectedMisconceptionId.HasValue)
             await _learner.RecalculateMisconceptionAsync(userId, affectedMisconceptionId.Value, ct);
@@ -506,11 +520,8 @@ public sealed class DiagnosticService : IDiagnosticService
                 ct)).SingleOrDefault();
         }
 
-        var correctOption = (await _uow.AnswerOptions.WhereAsync(
-            x => x.QuestionVersionId == version.Id && x.IsCorrect,
-            ct)).Single();
-
         return new AnswerFeedbackDto(
+            true,
             option.IsCorrect,
             option.Feedback,
             version.CorrectExplanation,
@@ -551,7 +562,7 @@ public sealed class DiagnosticService : IDiagnosticService
         var correct = answers.Count(x => x.IsCorrect);
         var isExamSession = await _uow.ExamAttempts.AnyAsync(x => x.DiagnosticSessionId == sessionId, ct);
         var scoreDenominator = isExamSession ? session.PlannedQuestionCount : answers.Count;
-        var accuracy = scoreDenominator == 0 ? 0d : correct / (double)scoreDenominator;
+        var accuracy = scoreDenominator == 0 ? 0d : Math.Min(1d, correct / (double)scoreDenominator);
 
         session.OverallScore = accuracy;
         session.Status = DiagnosticStatus.ReportReady;
@@ -559,6 +570,7 @@ public sealed class DiagnosticService : IDiagnosticService
         _uow.DiagnosticSessions.Update(session);
 
         var topics = await _learner.GetTopicMasteryAsync(userId, ct);
+        await ScheduleSpacedReviewAfterDiagnosticAsync(userId, topics, ct);
         var misconceptions = await _learner.ListMisconceptionsAsync(userId, ct);
         var detected = misconceptions.Count(x =>
             x.Status is MisconceptionStatus.Detected
@@ -572,7 +584,7 @@ public sealed class DiagnosticService : IDiagnosticService
             $"Диагностика завершена: правильных ответов {correct} из {scoreDenominator} ({accuracy:P0}). " +
             $"Наиболее сильная тема: {strongest?.Name ?? "н/д"}; " +
             $"наиболее приоритетная для повторения: {weakest?.Name ?? "н/д"}. " +
-            $"Активных устойчивых заблуждений: {detected}.";
+            $"Типичных ошибок требуют внимания: {detected}.";
 
         var report = new DiagnosticReport
         {
@@ -636,7 +648,7 @@ public sealed class DiagnosticService : IDiagnosticService
 
         var report = reports.OrderByDescending(x => x.GeneratedAt).FirstOrDefault();
         if (report is null)
-            return await CompleteAsync(userId, sessionId, ct);
+            throw new InvalidOperationException("Отчёт ещё не сформирован. Сначала завершите диагностику.");
 
         var answers = await _uow.DiagnosticAnswers.WhereAsync(
             x => x.SessionId == sessionId && x.UserId == userId,
@@ -679,11 +691,17 @@ public sealed class DiagnosticService : IDiagnosticService
 
         var question = await _uow.Questions.GetByIdAsync(entry.QuestionId, ct)
             ?? throw new KeyNotFoundException("Задание из диагностики не найдено.");
-        var versions = await _uow.QuestionVersions.WhereAsync(
-            x => x.QuestionId == question.Id && x.VersionNumber == question.CurrentVersionNumber,
-            ct);
-        var version = versions.SingleOrDefault()
-            ?? throw new InvalidOperationException("У задания отсутствует текущая версия.");
+        QuestionVersion? version = null;
+        if (entry.QuestionVersionId.HasValue)
+            version = await _uow.QuestionVersions.GetByIdAsync(entry.QuestionVersionId.Value, ct);
+        if (version is null)
+        {
+            version = (await _uow.QuestionVersions.WhereAsync(
+                x => x.QuestionId == question.Id && x.VersionNumber == question.CurrentVersionNumber,
+                ct)).SingleOrDefault();
+        }
+        if (version is null || version.QuestionId != question.Id)
+            throw new InvalidOperationException("У задания отсутствует версия, закреплённая за диагностикой.");
         var topic = await _uow.Topics.GetByIdAsync(question.TopicId, ct)
             ?? throw new InvalidOperationException("Тема задания не найдена.");
         var optionEntities = await _uow.AnswerOptions.WhereAsync(
@@ -704,7 +722,7 @@ public sealed class DiagnosticService : IDiagnosticService
             $"Диагностика преподавателя · вопрос {position} из {entries.Length}.");
     }
 
-    private async Task<DiagnosticSession?> NormalizeActiveSessionAsync(
+    private async Task<DiagnosticSession?> FindActiveSessionAsync(
         Guid userId,
         CancellationToken ct)
     {
@@ -713,42 +731,31 @@ public sealed class DiagnosticService : IDiagnosticService
                  (x.Status == DiagnosticStatus.Created || x.Status == DiagnosticStatus.InProgress),
             ct);
 
-        if (active.Count == 0)
-            return null;
-
-        var ordered = active
+        return active
             .OrderByDescending(x => x.AnsweredQuestionCount)
             .ThenByDescending(x => x.UpdatedAt)
             .ThenByDescending(x => x.CreatedAt)
-            .ToArray();
-
-        var canonical = ordered[0];
-        var changed = false;
-
-        if (canonical.Status == DiagnosticStatus.Created)
-        {
-            canonical.Status = DiagnosticStatus.InProgress;
-            canonical.StartedAt ??= _clock.UtcNow;
-            canonical.Touch();
-            _uow.DiagnosticSessions.Update(canonical);
-            changed = true;
-        }
-
-        foreach (var duplicate in ordered.Skip(1))
-        {
-            duplicate.Status = DiagnosticStatus.Cancelled;
-            duplicate.CompletedAt ??= _clock.UtcNow;
-            duplicate.Touch();
-            _uow.DiagnosticSessions.Update(duplicate);
-            changed = true;
-        }
-
-        if (changed)
-            await _uow.SaveChangesAsync(ct);
-
-        return canonical;
+            .FirstOrDefault();
     }
 
+    public async Task<DiagnosticSessionDto> CancelAsync(
+        Guid userId,
+        Guid sessionId,
+        CancellationToken ct = default)
+    {
+        var session = await GetOwnedSessionAsync(userId, sessionId, ct);
+        if (session.Status is not (DiagnosticStatus.Created or DiagnosticStatus.InProgress))
+            throw new InvalidOperationException("Можно отменить только незавершённую диагностику.");
+        if (await ExamSessionRules.IsExamSessionAsync(_uow, session.Id, ct))
+            throw new InvalidOperationException("Начатый экзамен нельзя отменить. Завершите попытку.");
+
+        session.Status = DiagnosticStatus.Cancelled;
+        session.CompletedAt = _clock.UtcNow;
+        session.Touch();
+        _uow.DiagnosticSessions.Update(session);
+        await _uow.SaveChangesAsync(ct);
+        return Map(session);
+    }
 
     private async Task<bool> IsExpiredExamSessionAsync(Guid sessionId, CancellationToken ct)
     {
@@ -758,6 +765,36 @@ public sealed class DiagnosticService : IDiagnosticService
 
         var exam = await _uow.ExamDefinitions.GetByIdAsync(attempt.ExamId, ct);
         return exam is not null && _clock.UtcNow >= attempt.StartedAt.AddMinutes(exam.TimeLimitMinutes);
+    }
+
+    private async Task ScheduleSpacedReviewAfterDiagnosticAsync(
+        Guid userId,
+        IReadOnlyList<TopicProgressDto> topics,
+        CancellationToken ct)
+    {
+        var existing = (await _uow.SpacedReviewItems.WhereAsync(x => x.UserId == userId, ct))
+            .ToDictionary(x => x.TopicId);
+        var changed = false;
+
+        foreach (var topic in topics)
+        {
+            if (existing.ContainsKey(topic.TopicId))
+                continue;
+
+            var delay = topic.Mastery < .45d ? 0 : topic.Mastery < .65d ? 1 : topic.Mastery < .8d ? 3 : 7;
+            await _uow.SpacedReviewItems.AddAsync(new SpacedReviewItem
+            {
+                UserId = userId,
+                TopicId = topic.TopicId,
+                NextReviewAt = _clock.UtcNow.AddDays(delay),
+                IntervalDays = delay,
+                Repetitions = 0
+            }, ct);
+            changed = true;
+        }
+
+        if (changed)
+            await _uow.SaveChangesAsync(ct);
     }
 
     private async Task<DiagnosticSession> GetOwnedSessionAsync(
@@ -843,5 +880,6 @@ public sealed class DiagnosticService : IDiagnosticService
             session.AnsweredQuestionCount,
             session.StartedAt,
             session.CompletedAt,
-            session.OverallScore);
+            session.OverallScore,
+            session.DiagnosticTemplateId);
 }

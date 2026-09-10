@@ -37,8 +37,8 @@ export function TeacherConfidencePage() {
                 <tr key={item.studentId}>
                   <td><strong>{item.displayName}</strong></td>
                   <td>{item.answersWithConfidence}</td>
-                  <td>{item.answersWithConfidence ? `${item.meanConfidence.toFixed(1)} / 4` : '—'}</td>
-                  <td>{item.answersWithConfidence ? `${Math.round(item.accuracy * 100)}%` : '—'}</td>
+                  <td>{item.answersWithConfidence ? `${item.meanConfidence.toFixed(1)} / 4` : '-'}</td>
+                  <td>{item.answersWithConfidence ? `${Math.round(item.accuracy * 100)}%` : '-'}</td>
                   <td>{item.overconfidentWrong}</td>
                   <td>{item.lowConfidenceCorrect}</td>
                 </tr>

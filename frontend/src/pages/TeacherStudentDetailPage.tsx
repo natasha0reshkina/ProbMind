@@ -73,7 +73,7 @@ export function TeacherStudentDetailPage() {
     { key: 'question', title: 'Задание', width: '30%', render: (row) => <span className="table-wrap-text">{row.prompt}</span>, sortValue: (row) => row.prompt },
     { key: 'selected', title: 'Ответ студента', width: '18%', render: (row) => <span className="table-wrap-text teacher-answer-wrong">{row.selectedAnswer}</span> },
     { key: 'correct', title: 'Правильный ответ', width: '18%', render: (row) => <span className="table-wrap-text teacher-answer-correct">{row.correctAnswer}</span> },
-    { key: 'misconception', title: 'Типичная ошибка', width: '20%', render: (row) => row.misconceptionTitle ?? <span className="muted">Не классифицирована</span>, sortValue: (row) => row.misconceptionTitle ?? '' },
+    { key: 'misconception', title: 'Типичное затруднение', width: '20%', render: (row) => row.misconceptionTitle ?? <span className="muted">Не классифицирована</span>, sortValue: (row) => row.misconceptionTitle ?? '' },
   ]
 
   async function downloadProfile() {
@@ -96,12 +96,20 @@ export function TeacherStudentDetailPage() {
         actions={<button className="secondary-button" onClick={() => void downloadProfile()}><Download size={16} /> Скачать отчёт</button>}
       />
 
+      {data && (
+        <section className="panel student-profile-facts">
+          <div><span>E-mail</span><strong>{data.email}</strong></div>
+          <div><span>Группа</span><strong>{data.groupNames.length ? data.groupNames.join(', ') : 'Не назначена'}</strong></div>
+          <div><span>Последняя активность</span><strong>{data.lastActivityAt ? dateTime(data.lastActivityAt) : 'Нет данных'}</strong></div>
+        </section>
+      )}
+
       <KpiStrip items={[
         { label: 'Общий уровень', value: hasTopicObservations ? percent(data?.overallMastery) : 'Нет данных', tone: hasTopicObservations ? ((data?.overallMastery ?? 0) > .7 ? 'positive' : 'warning') : undefined },
-        { label: 'Активные заблуждения', value: data?.activeMisconceptions ?? '—', tone: data?.activeMisconceptions ? 'warning' : 'positive' },
-        { label: 'Исправлено', value: data?.correctedMisconceptions ?? '—', tone: 'positive' },
-        { label: 'Диагностик', value: data?.completedDiagnostics ?? '—' },
-        { label: 'Практических сессий', value: data?.completedPracticeSessions ?? '—' },
+        { label: 'Активные заблуждения', value: data?.activeMisconceptions ?? '-', tone: data?.activeMisconceptions ? 'warning' : 'positive' },
+        { label: 'Исправлено', value: data?.correctedMisconceptions ?? '-', tone: 'positive' },
+        { label: 'Диагностик', value: data?.completedDiagnostics ?? '-' },
+        { label: 'Практических сессий', value: data?.completedPracticeSessions ?? '-' },
       ]} />
 
       <div className="two-column">
@@ -126,7 +134,7 @@ export function TeacherStudentDetailPage() {
               <div className="big-score compact-score">{percent(stability.data?.stability)}</div>
               <p className="muted">{stability.data ? statusLabel(stability.data.interpretation) : ''}</p>
               <div className="mini-metrics mini-metrics--spaced">
-                <div><span>Изменений плана</span><strong>{stability.data?.revisions ?? '—'}</strong></div>
+                <div><span>Изменений плана</span><strong>{stability.data?.revisions ?? '-'}</strong></div>
                 <div><span>Сохранено шагов в среднем</span><strong>{percent(stability.data?.meanRetention)}</strong></div>
               </div>
             </>
@@ -152,7 +160,7 @@ export function TeacherStudentDetailPage() {
           <BarChartPanel title="Выраженность активных ошибок" data={misconceptionChart} xKey="name" series={[{ key: 'confidence', label: 'Выраженность' }]} percent height={300} horizontal />
         ) : (
           <section className="panel teacher-inline-empty">
-            <strong>Типичные ошибки пока не выявлены</strong>
+            <strong>Типичные затруднения пока не выявлены</strong>
             <p>Этот блок заполнится после появления диагностических результатов.</p>
           </section>
         )}
@@ -196,14 +204,14 @@ export function TeacherStudentDetailPage() {
           columns={mistakeColumns}
           rowKey={(row) => row.id}
           searchText={(row) => `${row.topicName} ${row.prompt} ${row.selectedAnswer} ${row.correctAnswer} ${row.misconceptionTitle ?? ''}`}
-          searchPlaceholder="Тема, задание или типичная ошибка…"
+          searchPlaceholder="Тема, задание или типичное затруднение…"
           pageSize={10}
           emptyText="У студента пока нет сохранённых неверных ответов"
         />
       </section>
 
       <section className="panel">
-        <div className="panel-title"><div><h2>Состояние типичных ошибок</h2><p className="muted chart-subtitle">Ошибки, которые повторялись в ответах студента и учитываются при дальнейшей работе.</p></div><Brain size={20} /></div>
+        <div className="panel-title"><div><h2>Состояние типичных затруднений</h2><p className="muted chart-subtitle">Ошибки, которые повторялись в ответах студента и учитываются при дальнейшей работе.</p></div><Brain size={20} /></div>
         <div className="cards-grid cards-grid--two">
           {(data?.misconceptions ?? []).map((item) => (
             <article className="analysis-card" key={item.misconceptionId}>

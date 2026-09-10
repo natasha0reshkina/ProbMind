@@ -75,10 +75,10 @@ export function QuestionAnalyticsPage() {
       sortValue: (row) => row.prompt,
     },
     { key: 'responses', title: 'Ответов', render: (row) => row.responses.toLocaleString('ru-RU'), sortValue: (row) => row.responses, align: 'right' as const },
-    { key: 'correct', title: 'Правильных', render: (row) => row.responses ? percent(Math.min(1, Math.max(0, row.correctRate)), 0) : '—', sortValue: (row) => row.correctRate, align: 'right' as const },
-    { key: 'difficulty', title: 'Факт. сложность', render: (row) => row.responses ? number(row.difficulty, 2) : '—', sortValue: (row) => row.difficulty, align: 'right' as const },
-    { key: 'discrimination', title: 'Различение', render: (row) => row.responses ? number(row.discrimination, 2) : '—', sortValue: (row) => row.discrimination, align: 'right' as const },
-    { key: 'time', title: 'Время ответа', render: (row) => row.responses ? duration(row.medianResponseSeconds) : '—', sortValue: (row) => row.medianResponseSeconds },
+    { key: 'correct', title: 'Правильных', render: (row) => row.responses ? percent(Math.min(1, Math.max(0, row.correctRate)), 0) : '-', sortValue: (row) => row.correctRate, align: 'right' as const },
+    { key: 'difficulty', title: 'Факт. сложность', render: (row) => row.responses ? number(row.difficulty, 2) : '-', sortValue: (row) => row.difficulty, align: 'right' as const },
+    { key: 'discrimination', title: 'Различение', render: (row) => row.responses ? number(row.discrimination, 2) : '-', sortValue: (row) => row.discrimination, align: 'right' as const },
+    { key: 'time', title: 'Время ответа', render: (row) => row.responses ? duration(row.medianResponseSeconds) : '-', sortValue: (row) => row.medianResponseSeconds },
     { key: 'quality', title: 'Состояние', render: (row) => <StatusBadge value={row.qualityBand} />, sortValue: (row) => row.qualityBand },
   ], [])
 
@@ -103,8 +103,8 @@ export function QuestionAnalyticsPage() {
       <KpiStrip items={[
         { label: 'Заданий с ответами', value: withResponses.length },
         { label: 'Всего ответов', value: totalResponses.toLocaleString('ru-RU') },
-        { label: 'Правильных ответов', value: totalResponses ? percent(weightedCorrect) : '—' },
-        { label: 'Среднее различение', value: withResponses.length ? number(meanDiscrimination, 2) : '—' },
+        { label: 'Правильных ответов', value: totalResponses ? percent(weightedCorrect) : '-' },
+        { label: 'Среднее различение', value: withResponses.length ? number(meanDiscrimination, 2) : '-' },
         { label: 'Стоит проверить', value: weak, tone: weak ? 'warning' : 'positive' },
       ]} />
 

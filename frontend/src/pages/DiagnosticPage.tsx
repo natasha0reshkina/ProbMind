@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { api } from '../api/client'
 import { ErrorView } from '../components/ErrorView'
 import { LoadingView } from '../components/LoadingView'
@@ -54,6 +54,12 @@ export function DiagnosticPage() {
     queryFn: async () => (await api.get<DiagnosticTemplate[]>('/diagnostic-templates/student')).data,
   })
 
+  const diagnosticHistory = useQuery({
+    queryKey: ['diagnostic-history', user?.id],
+    enabled: !resumeSessionId,
+    queryFn: async () => (await api.get<DiagnosticSession[]>('/diagnostics')).data,
+  })
+
   const start = useMutation({
     mutationFn: async () => (await api.post<DiagnosticSession>('/diagnostics', { questionCount: 15 })).data,
     onSuccess: (data) => setSession(data),
@@ -69,6 +75,16 @@ export function DiagnosticPage() {
         client.invalidateQueries({ queryKey: ['diagnostic-history'] }),
       ])
       navigate(`/diagnostics/${data.id}/continue`)
+    },
+  })
+
+  const cancel = useMutation({
+    mutationFn: async (sessionId: string) => (await api.post<DiagnosticSession>(`/diagnostics/${sessionId}/cancel`)).data,
+    onSuccess: async () => {
+      await Promise.all([
+        client.invalidateQueries({ queryKey: ['diagnostic-active'] }),
+        client.invalidateQueries({ queryKey: ['diagnostic-history'] }),
+      ])
     },
   })
 
@@ -213,9 +229,26 @@ export function DiagnosticPage() {
       <div>
         <PageHeader
           eyebrow="Адаптивная диагностика"
-          title="Диагностика типичных заблуждений"
+          title="Диагностика"
           description="15 вопросов выбираются адаптивно: система учитывает слабые темы, предыдущие ответы, сложность и давность предыдущих показов."
         />
+        {(diagnosticHistory.data ?? []).some((item) => item.status === 'ReportReady') ? (
+          <section className="plain-section">
+            <div className="section-heading-row"><h2>История попыток</h2><Link to="/diagnostics/history">Все попытки</Link></div>
+            <div className="attempt-history-list">
+              {(diagnosticHistory.data ?? [])
+                .filter((item) => item.status === 'ReportReady')
+                .slice(0, 5)
+                .map((item) => (
+                  <button key={item.id} type="button" className="attempt-history-row" onClick={() => navigate(`/diagnostics/${item.id}/report`)}>
+                    <span>{item.completedAt ? new Date(item.completedAt).toLocaleString('ru-RU') : 'Завершена'}</span>
+                    <strong>{item.overallScore == null ? '-' : `${Math.round(item.overallScore * 100)}%`}</strong>
+                  </button>
+                ))}
+            </div>
+          </section>
+        ) : null}
+
         <section className="hero-panel diagnostic-intro-panel">
           <div>
             <h2>Что будет измеряться</h2>
@@ -231,12 +264,15 @@ export function DiagnosticPage() {
             {unfinished ? (
               <>
                 <p><strong>Есть незавершённая сессия:</strong> {unfinished.answeredQuestionCount} из {unfinished.plannedQuestionCount} вопросов уже отвечено.</p>
-                <button
-                  className="primary-button large"
-                  onClick={() => navigate(`/diagnostics/${unfinished.id}/continue`)}
-                >
-                  Продолжить диагностику
-                </button>
+                <div className="button-row">
+                  <button
+                    className="primary-button large"
+                    onClick={() => navigate(`/diagnostics/${unfinished.id}/continue`)}
+                  >
+                    Продолжить диагностику
+                  </button>
+                  <button className="secondary-button" type="button" disabled={cancel.isPending} onClick={() => cancel.mutate(unfinished.id)}>Отменить</button>
+                </div>
               </>
             ) : (
               <button className="primary-button large" onClick={() => start.mutate()} disabled={start.isPending}>
@@ -250,30 +286,44 @@ export function DiagnosticPage() {
         {(teacherTemplates.data ?? []).length > 0 ? (
           <section className="plain-section teacher-diagnostic-list-section">
             <h2>Диагностики преподавателя</h2>
-            <p className="muted">Эти наборы составлены преподавателем из выбранных заданий. Порядок вопросов фиксирован.</p>
-            {unfinished ? <p className="muted">Если начать другую диагностику, текущая незавершённая сессия будет отменена.</p> : null}
+            {unfinished ? <p className="muted">Сначала завершите или отмените текущую диагностику.</p> : null}
             <div className="study-list">
-              {(teacherTemplates.data ?? []).map((template) => (
-                <article className="study-card" key={template.id}>
-                  <div className="study-card__heading">
-                    <div><span className="eyebrow">{template.questionCount} заданий</span><h3>{template.title}</h3></div>
-                  </div>
-                  {template.description ? <p className="study-card__body">{template.description}</p> : null}
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    disabled={startTemplate.isPending}
-                    onClick={() => startTemplate.mutate(template.id)}
-                  >
-                    {startTemplate.isPending ? 'Открываем…' : 'Начать диагностику'}
-                  </button>
-                </article>
-              ))}
-              {confidenceLevel != null ? <button type="button" className="confidence-clear" disabled={Boolean(feedback) || examTimeExpired} onClick={() => setConfidenceLevel(null)}>Не указывать</button> : null}
+              {(teacherTemplates.data ?? []).map((template) => {
+                const attempts = (diagnosticHistory.data ?? [])
+                  .filter((item) => item.diagnosticTemplateId === template.id && item.status === 'ReportReady')
+                  .sort((a, b) => new Date(b.completedAt ?? 0).getTime() - new Date(a.completedAt ?? 0).getTime())
+                return (
+                  <article className="study-card" key={template.id}>
+                    <div className="study-card__heading">
+                      <div><span className="eyebrow">{template.questionCount} заданий</span><h3>{template.title}</h3></div>
+                    </div>
+                    {template.description ? <p className="study-card__body">{template.description}</p> : null}
+                    {attempts.length > 0 ? (
+                      <div className="template-attempts">
+                        <strong>Предыдущие попытки: {attempts.length}</strong>
+                        {attempts.slice(0, 3).map((attempt) => (
+                          <button key={attempt.id} type="button" className="attempt-link" onClick={() => navigate(`/diagnostics/${attempt.id}/report`)}>
+                            {attempt.completedAt ? new Date(attempt.completedAt).toLocaleDateString('ru-RU') : 'Завершена'}, {attempt.overallScore == null ? '-' : `${Math.round(attempt.overallScore * 100)}%`}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={startTemplate.isPending || Boolean(unfinished)}
+                      onClick={() => startTemplate.mutate(template.id)}
+                    >
+                      {startTemplate.isPending ? 'Открываем…' : attempts.length > 0 ? 'Пройти ещё раз' : 'Начать диагностику'}
+                    </button>
+                  </article>
+                )
+              })}
             </div>
             {startTemplate.isError ? <div className="form-error">Не удалось начать диагностику преподавателя.</div> : null}
           </section>
         ) : null}
+
       </div>
     )
   }
@@ -311,7 +361,7 @@ export function DiagnosticPage() {
       <PageHeader
         eyebrow={`Сессия ${session.id.slice(0, 8)}`}
         title={question.topicName}
-        description={`${statusLabel(question.difficulty)}${question.isTransfer ? ' · проверка переноса' : ''}`}
+        description={`${statusLabel(question.difficulty)}${question.isTransfer ? ' · применение в новой ситуации' : ''}`}
       />
       <ProgressBar
         value={session.answeredQuestionCount / session.plannedQuestionCount}
@@ -321,7 +371,7 @@ export function DiagnosticPage() {
       {isExam ? <div className={`exam-mode-banner ${examTimeExpired ? 'exam-mode-banner--expired' : ''}`}><strong>Экзаменационный режим</strong><span>{examContext.data?.title}{examTimerLabel ? ` · осталось ${examTimerLabel}` : examExpiresAt ? ` · завершить до ${examExpiresAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}` : ''}</span></div> : <p className="selection-note"><strong>Основание выбора:</strong> {question.selectionExplanation}</p>}
 
       <section className="question-card">
-        <div className="question-topic-banner"><span>Тема задания</span><strong>{question.topicName}</strong><em>{statusLabel(question.difficulty)}{question.isTransfer ? ' · перенос' : ''}</em></div>
+        <div className="question-topic-banner"><span>Тема задания</span><strong>{question.topicName}</strong><em>{statusLabel(question.difficulty)}{question.isTransfer ? ' · новая ситуация' : ''}</em></div>
         <h2>{question.prompt}</h2>
         <div className="answer-grid">
           {question.options.map((option, index) => (

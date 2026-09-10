@@ -10,6 +10,7 @@ public sealed record StudentOverviewDto(
     int CompletedDiagnostics,
     int CompletedPracticeSessions,
     DateTimeOffset? LastActivityAt,
+    IReadOnlyList<string> GroupNames,
     IReadOnlyList<TopicProgressDto> Topics,
     IReadOnlyList<UserMisconceptionDto> Misconceptions);
 
@@ -24,7 +25,8 @@ public sealed record StudentListItemDto(
     int WrongAnswers,
     double DiagnosticAccuracy,
     IReadOnlyList<string> ActiveMisconceptionTitles,
-    DateTimeOffset? LastActivityAt);
+    DateTimeOffset? LastActivityAt,
+    IReadOnlyList<string> GroupNames);
 
 public sealed record StudentMistakeDto(
     Guid Id,

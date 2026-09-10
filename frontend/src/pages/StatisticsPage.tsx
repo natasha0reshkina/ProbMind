@@ -109,8 +109,8 @@ export function StatisticsPage() {
                 <tr key={topic.topicId}>
                   <td><strong>{topic.name}</strong></td>
                   <td>{topic.observationCount}</td>
-                  <td className="numeric-cell">{topic.observationCount > 0 ? `${Math.round(topic.uncertainty * 100)}%` : '—'}</td>
-                  <td className="numeric-cell"><strong>{topic.observationCount > 0 ? `${Math.round(topic.mastery * 100)}%` : '—'}</strong></td>
+                  <td className="numeric-cell">{topic.observationCount > 0 ? `${Math.round(topic.uncertainty * 100)}%` : '-'}</td>
+                  <td className="numeric-cell"><strong>{topic.observationCount > 0 ? `${Math.round(topic.mastery * 100)}%` : '-'}</strong></td>
                 </tr>
               ))}
             </tbody>

@@ -117,18 +117,18 @@ export function OperationsPage() {
         description="Панель состояния показывает работу API, время обработки запросов и накопленные ошибки. Данные обновляются каждые 8 секунд."
       />
       <KpiStrip items={[
-        { label: 'Всего запросов', value: runtime.data?.totalRequests.toLocaleString('ru-RU') ?? '—' },
-        { label: 'Ошибок', value: runtime.data?.totalFailures ?? '—', tone: runtime.data?.totalFailures ? 'danger' : 'positive' },
+        { label: 'Всего запросов', value: runtime.data?.totalRequests.toLocaleString('ru-RU') ?? '-' },
+        { label: 'Ошибок', value: runtime.data?.totalFailures ?? '-', tone: runtime.data?.totalFailures ? 'danger' : 'positive' },
         { label: 'Доля ошибок', value: `${(failureRate * 100).toFixed(2)}%`, tone: failureRate > .01 ? 'danger' : 'positive' },
-        { label: 'Среднее время ответа', value: runtime.data ? `${number(runtime.data.meanMilliseconds, 1)} ms` : '—' },
+        { label: 'Среднее время ответа', value: runtime.data ? `${number(runtime.data.meanMilliseconds, 1)} ms` : '-' },
         { label: 'Время работы', value: duration(process.data?.uptimeSeconds) },
       ]} />
 
       <div className="system-grid">
-        <article className="system-card"><Server size={19} /><div><span>Узел</span><strong>{process.data?.machineName ?? '—'}</strong><small>{process.data?.framework ?? ''}</small></div></article>
-        <article className="system-card"><Cpu size={19} /><div><span>CPU</span><strong>{process.data?.processorCount ?? '—'} ядер</strong><small>{process.data?.threads ?? '—'} потоков процесса</small></div></article>
+        <article className="system-card"><Server size={19} /><div><span>Узел</span><strong>{process.data?.machineName ?? '-'}</strong><small>{process.data?.framework ?? ''}</small></div></article>
+        <article className="system-card"><Cpu size={19} /><div><span>CPU</span><strong>{process.data?.processorCount ?? '-'} ядер</strong><small>{process.data?.threads ?? '-'} потоков процесса</small></div></article>
         <article className="system-card"><HardDrive size={19} /><div><span>Память процесса</span><strong>{bytes(process.data?.workingSetBytes)}</strong><small>частная память {bytes(process.data?.privateMemoryBytes)}</small></div></article>
-        <article className="system-card"><TimerReset size={19} /><div><span>Запущен</span><strong>{dateTime(process.data?.startedAt)}</strong><small>PID {process.data?.processId ?? '—'}</small></div></article>
+        <article className="system-card"><TimerReset size={19} /><div><span>Запущен</span><strong>{dateTime(process.data?.startedAt)}</strong><small>PID {process.data?.processId ?? '-'}</small></div></article>
       </div>
 
       <div className="two-column">

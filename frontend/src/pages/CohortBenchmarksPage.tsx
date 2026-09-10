@@ -42,7 +42,7 @@ export function CohortBenchmarksPage() {
     { key: 'z', title: 'Отклонение от среднего', render: (row) => number(row.zScore, 2), sortValue: (row) => row.zScore, align: 'right' },
     { key: 'band', title: 'Диапазон', render: (row) => <StatusBadge value={row.band} />, sortValue: (row) => row.band },
     { key: 'mis', title: 'Активных заблуждений', render: (row) => row.activeMisconceptions, sortValue: (row) => row.activeMisconceptions, align: 'right' },
-    { key: 'risk', title: 'Риск', render: (row) => row.risk ? <StatusBadge value={row.risk.level} /> : '—', sortValue: (row) => row.risk?.risk ?? 0 },
+    { key: 'risk', title: 'Риск', render: (row) => row.risk ? <StatusBadge value={row.risk.level} /> : '-', sortValue: (row) => row.risk?.risk ?? 0 },
   ]
 
   return (

@@ -342,14 +342,17 @@ public sealed class DatabaseSeeder
                 "Id" uuid NOT NULL,
                 "DiagnosticTemplateId" uuid NOT NULL,
                 "QuestionId" uuid NOT NULL,
+                "QuestionVersionId" uuid NULL,
                 "Position" integer NOT NULL,
                 "CreatedAt" timestamp with time zone NOT NULL,
                 "UpdatedAt" timestamp with time zone NOT NULL,
                 "Version" bigint NOT NULL,
                 CONSTRAINT "PK_diagnostic_template_questions" PRIMARY KEY ("Id")
             );
+            ALTER TABLE diagnostic_template_questions ADD COLUMN IF NOT EXISTS "QuestionVersionId" uuid NULL;
             CREATE INDEX IF NOT EXISTS "IX_diagnostic_template_questions_DiagnosticTemplateId" ON diagnostic_template_questions ("DiagnosticTemplateId");
             CREATE INDEX IF NOT EXISTS "IX_diagnostic_template_questions_QuestionId" ON diagnostic_template_questions ("QuestionId");
+            CREATE INDEX IF NOT EXISTS "IX_diagnostic_template_questions_QuestionVersionId" ON diagnostic_template_questions ("QuestionVersionId");
             CREATE UNIQUE INDEX IF NOT EXISTS "IX_diagnostic_template_questions_DiagnosticTemplateId_Position" ON diagnostic_template_questions ("DiagnosticTemplateId", "Position");
             CREATE UNIQUE INDEX IF NOT EXISTS "IX_diagnostic_template_questions_DiagnosticTemplateId_QuestionId" ON diagnostic_template_questions ("DiagnosticTemplateId", "QuestionId");
             """,

@@ -16,7 +16,7 @@ public sealed class LearningPathsController : ControllerBase
     public LearningPathsController(ILearningPathService paths) => _paths = paths;
 
     [HttpGet("current")]
-    public Task<LearningPathDto> Current(CancellationToken ct) =>
+    public Task<LearningPathDto?> Current(CancellationToken ct) =>
         _paths.GetCurrentAsync(UserContext.UserId(User), ct);
 
     [HttpPost("rebuild")]

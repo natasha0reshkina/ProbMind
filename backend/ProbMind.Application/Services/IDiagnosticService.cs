@@ -12,4 +12,5 @@ public interface IDiagnosticService
     Task<AnswerFeedbackDto> SubmitAsync(Guid userId, SubmitDiagnosticAnswerRequest request, CancellationToken ct = default);
     Task<DiagnosticReportDto> CompleteAsync(Guid userId, Guid sessionId, CancellationToken ct = default);
     Task<DiagnosticReportDto> ReportAsync(Guid userId, Guid sessionId, CancellationToken ct = default);
+    Task<DiagnosticSessionDto> CancelAsync(Guid userId, Guid sessionId, CancellationToken ct = default);
 }

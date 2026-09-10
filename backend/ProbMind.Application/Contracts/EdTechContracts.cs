@@ -5,7 +5,7 @@ public sealed record SpacedReviewDto(
     string TopicCode,
     string TopicName,
     double Mastery,
-    DateTimeOffset NextReviewAt,
+    DateTimeOffset? NextReviewAt,
     DateTimeOffset? LastReviewedAt,
     int IntervalDays,
     int Repetitions,

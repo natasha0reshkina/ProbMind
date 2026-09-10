@@ -219,12 +219,19 @@ public sealed class DiagnosticTemplateService : IDiagnosticTemplateService
         if (questionIds.Length < 1 || questionIds.Length > 30)
             throw new InvalidOperationException("В диагностике должно быть от 1 до 30 заданий.");
 
+        var versionByQuestionId = new Dictionary<Guid, Guid>();
         foreach (var questionId in questionIds)
         {
             var question = await _uow.Questions.GetByIdAsync(questionId, ct)
                 ?? throw new KeyNotFoundException("Одно из выбранных заданий не найдено.");
             if (question.Status != ContentStatus.Published || question.Kind != QuestionKind.Diagnostic)
                 throw new InvalidOperationException($"Задание '{question.Code}' недоступно для диагностики.");
+
+            var version = (await _uow.QuestionVersions.WhereAsync(
+                x => x.QuestionId == question.Id && x.VersionNumber == question.CurrentVersionNumber,
+                ct)).SingleOrDefault()
+                ?? throw new InvalidOperationException($"У задания '{question.Code}' отсутствует текущая версия.");
+            versionByQuestionId[question.Id] = version.Id;
         }
 
         var template = new DiagnosticTemplate
@@ -245,6 +252,7 @@ public sealed class DiagnosticTemplateService : IDiagnosticTemplateService
             {
                 DiagnosticTemplateId = template.Id,
                 QuestionId = questionIds[index],
+                QuestionVersionId = versionByQuestionId[questionIds[index]],
                 Position = index + 1
             }, ct);
         }
@@ -324,12 +332,19 @@ public sealed class DiagnosticTemplateService : IDiagnosticTemplateService
         if (existingItems.Length + additions.Length > 30)
             throw new InvalidOperationException("В диагностике может быть не больше 30 заданий.");
 
+        var versionByAddedQuestionId = new Dictionary<Guid, Guid>();
         foreach (var questionId in additions)
         {
             var question = await _uow.Questions.GetByIdAsync(questionId, ct)
                 ?? throw new KeyNotFoundException("Одно из выбранных заданий не найдено.");
             if (question.Status != ContentStatus.Published || question.Kind != QuestionKind.Diagnostic)
                 throw new InvalidOperationException($"Задание '{question.Code}' недоступно для диагностики.");
+
+            var version = (await _uow.QuestionVersions.WhereAsync(
+                x => x.QuestionId == question.Id && x.VersionNumber == question.CurrentVersionNumber,
+                ct)).SingleOrDefault()
+                ?? throw new InvalidOperationException($"У задания '{question.Code}' отсутствует текущая версия.");
+            versionByAddedQuestionId[question.Id] = version.Id;
         }
 
         var position = existingItems.Length;
@@ -340,6 +355,7 @@ public sealed class DiagnosticTemplateService : IDiagnosticTemplateService
             {
                 DiagnosticTemplateId = templateId,
                 QuestionId = questionId,
+                QuestionVersionId = versionByAddedQuestionId[questionId],
                 Position = position
             }, ct);
         }

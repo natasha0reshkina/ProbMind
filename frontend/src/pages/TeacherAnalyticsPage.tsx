@@ -80,13 +80,13 @@ export function TeacherAnalyticsPage() {
       <PageHeader
         eyebrow="Преподаватель"
         title="Сводка по группе"
-        description="Здесь собраны показатели, которые помогают понять результаты студентов: кто уже прошёл диагностику, где больше неверных ответов и какие типичные ошибки встречаются чаще."
+        description="Здесь собраны показатели, которые помогают понять результаты студентов: кто уже прошёл диагностику, где больше неверных ответов и какие типичные затруднения встречаются чаще."
       />
 
       <KpiStrip items={[
         { label: 'Студентов в группе', value: cohort.data?.students ?? 0 },
         { label: 'Есть результаты', value: studentsWithResults },
-        { label: 'Доля правильных ответов', value: totalAnswers > 0 ? percent(weightedAccuracy) : '—' },
+        { label: 'Доля правильных ответов', value: totalAnswers > 0 ? percent(weightedAccuracy) : '-' },
         { label: 'Неверных ответов', value: totalWrong },
         { label: 'Есть устойчивые ошибки', value: studentsWithErrors },
       ]} />
@@ -103,7 +103,7 @@ export function TeacherAnalyticsPage() {
           columns={studentColumns}
           rowKey={(row) => row.userId}
           searchText={(row) => `${row.displayName} ${row.email} ${row.activeMisconceptionTitles.join(' ')}`}
-          searchPlaceholder="Студент или типичная ошибка…"
+          searchPlaceholder="Студент или типичное затруднение…"
           pageSize={10}
           onRowClick={(row) => navigate(`/teacher/students/${row.userId}`)}
           emptyText="Пока недостаточно результатов студентов"
@@ -132,7 +132,7 @@ export function TeacherAnalyticsPage() {
       <div className="two-column teacher-summary-charts">
         {studentsWithResults >= 3 ? (
           <BarChartPanel
-            title="Наиболее частые типичные ошибки"
+            title="Наиболее частые типичные затруднения"
             subtitle="Доля студентов с результатами диагностики, у которых сейчас сохраняется соответствующее затруднение."
             data={prevalence}
             xKey="name"
@@ -143,10 +143,10 @@ export function TeacherAnalyticsPage() {
           />
         ) : (
           <section className="teacher-data-note">
-            <div className="teacher-data-note__title"><h2>Наиболее частые типичные ошибки</h2></div>
+            <div className="teacher-data-note__title"><h2>Наиболее частые типичные затруднения</h2></div>
             <div className="teacher-data-note__body">
               <strong>Для группового сравнения пока мало данных</strong>
-              <p>Нужно получить результаты как минимум трёх студентов. До этого момента ориентируйтесь на индивидуальные разборы в разделе «Студенты».</p>
+              <p>Нужно получить результаты как минимум трёх студентов. До этого момента ориентируйтесь на индивидуальные разборы в разделе Студенты.</p>
             </div>
           </section>
         )}

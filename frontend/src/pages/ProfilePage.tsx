@@ -55,25 +55,24 @@ export function ProfilePage() {
     const game = gamification.data
     return (
       <div>
-        <PageHeader title="Личный кабинет" description="Аккаунт, прогресс, учебная активность и рекомендации в одном месте." />
+        <PageHeader title="Личный кабинет" />
 
         <div className="cabinet-top-grid">
           <section className="plain-section cabinet-account-section">
             <h2>Аккаунт</h2>
             <form className="profile-form cabinet-profile-form" onSubmit={submit}>
               <label>Имя<input value={name} onChange={(event) => setName(event.target.value)} /></label>
-              <label>E-mail<input value={user.email} disabled /></label>
-              <label>Роль<input value={roleLabels[user.role]} disabled /></label>
               <div className="button-row"><button className="primary-button">{saved ? 'Сохранено' : 'Сохранить'}</button></div>
             </form>
+            <div className="account-readonly">
+              <div className="account-readonly__row"><span>E-mail</span><strong>{user.email}</strong></div>
+              <div className="account-readonly__row"><span>Роль</span><strong>{roleLabels[user.role]}</strong></div>
+            </div>
           </section>
 
           <section className="plain-section streak-section">
             <div className="section-heading-row">
-              <div>
-                <h2>Учебный стрик</h2>
-                <p className="muted">Дни с учебной активностью подряд.</p>
-              </div>
+              <h2>Учебный стрик</h2>
             </div>
             <div className="streak-value">{game?.currentStreak ?? 0}</div>
             <div className="streak-label">дней подряд</div>
@@ -81,7 +80,7 @@ export function ProfilePage() {
               <div><strong>{game?.longestStreak ?? 0}</strong><span>лучший стрик</span></div>
               <div><strong>{game?.activeDays ?? 0}</strong><span>активных дней</span></div>
               <div><strong>{game?.overallPoints ?? 0}</strong><span>баллов</span></div>
-              <div><strong>{game?.participatesInLeaderboard ? game.overallRank ?? '—' : '—'}</strong><span>место в общем рейтинге</span></div>
+              <div><strong>{game?.participatesInLeaderboard ? game.overallRank ?? '-' : '-'}</strong><span>место в общем рейтинге</span></div>
             </div>
             <label className="leaderboard-opt-in">
               <input
@@ -132,13 +131,21 @@ export function ProfilePage() {
 
   return (
     <div>
-      <PageHeader title="Профиль" description="Основные данные текущего аккаунта." />
-      <form className="profile-form" onSubmit={submit}>
-        <label>Имя<input value={name} onChange={(event) => setName(event.target.value)} /></label>
-        <label>E-mail<input value={user?.email ?? ''} disabled /></label>
-        <label>Роль<input value={user ? roleLabels[user.role] : ''} disabled /></label>
-        <div className="button-row"><button className="primary-button">{saved ? 'Сохранено' : 'Сохранить'}</button></div>
-      </form>
+      <PageHeader title="Профиль" />
+      <section className="plain-section">
+        <h2>Редактируемые данные</h2>
+        <form className="profile-form" onSubmit={submit}>
+          <label>Имя<input value={name} onChange={(event) => setName(event.target.value)} /></label>
+          <div className="button-row"><button className="primary-button">{saved ? 'Сохранено' : 'Сохранить'}</button></div>
+        </form>
+      </section>
+      <section className="plain-section">
+        <h2>Данные аккаунта</h2>
+        <div className="account-readonly">
+          <div className="account-readonly__row"><span>E-mail</span><strong>{user?.email ?? '-'}</strong></div>
+          <div className="account-readonly__row"><span>Роль</span><strong>{user ? roleLabels[user.role] : '-'}</strong></div>
+        </div>
+      </section>
     </div>
   )
 }

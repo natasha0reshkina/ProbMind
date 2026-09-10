@@ -1,5 +1,9 @@
+import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { api } from '../api/client'
+import type { NotificationItem } from '../types/api'
 
 const roleLabels = { Student: 'Студент', Teacher: 'Преподаватель', Admin: 'Администратор' } as const
 
@@ -131,41 +135,67 @@ const adminSections: NavSection[] = [
 
 export function AppShell() {
   const { user, logout } = useAuth()
+  const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem('probmind-sidebar-collapsed') === '1')
   const sections = user?.role === 'Admin' ? adminSections : user?.role === 'Teacher' ? teacherSections : studentSections
+  const unreadQuery = useQuery({
+    queryKey: ['notifications-nav', user?.id],
+    enabled: Boolean(user),
+    queryFn: async () => (await api.get<NotificationItem[]>('/notifications', { params: { unreadOnly: true } })).data,
+    refetchInterval: 30000,
+  })
+  const unreadCount = unreadQuery.data?.length ?? 0
+
+  function toggleSidebar() {
+    setCollapsed((current) => {
+      const next = !current
+      window.localStorage.setItem('probmind-sidebar-collapsed', next ? '1' : '0')
+      return next
+    })
+  }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <strong>ProbMind</strong>
-          <span>Учебный сервис по теории вероятностей</span>
-        </div>
+    <div className={`app-shell${collapsed ? ' app-shell--collapsed' : ''}`}>
+      <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
+        <button className="sidebar-toggle" type="button" onClick={toggleSidebar} aria-label={collapsed ? 'Открыть меню' : 'Скрыть меню'}>
+          <span aria-hidden="true">{collapsed ? '›' : '‹'}</span>
+        </button>
 
-        <nav className="nav-list" aria-label="Основная навигация">
-          {sections.map((section) => (
-            <div className="nav-section" key={section.title}>
-              <div className="nav-section__title">{section.title}</div>
-              {section.items.map(([to, label]) => (
-                <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
-                  {label}
-                </NavLink>
-              ))}
+        {!collapsed ? (
+          <>
+            <div className="brand">
+              <strong>ProbMind</strong>
             </div>
-          ))}
-        </nav>
 
-        <div className="sidebar__bottom">
-          <div className="nav-section__title nav-section__title--account">Аккаунт</div>
-          <div className="account-links">
-            <NavLink to="/notifications" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>Уведомления</NavLink>
-            {user?.role !== 'Student' ? <NavLink to="/profile" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>Профиль</NavLink> : null}
-            <button className="nav-item nav-button" onClick={() => void logout()}>Выйти</button>
-          </div>
-          <div className="user-block">
-            <strong>{user?.displayName}</strong>
-            <span>{user ? roleLabels[user.role] : ''}</span>
-          </div>
-        </div>
+            <nav className="nav-list" aria-label="Основная навигация">
+              {sections.map((section) => (
+                <div className="nav-section" key={section.title}>
+                  <div className="nav-section__title">{section.title}</div>
+                  {section.items.map(([to, label]) => (
+                    <NavLink key={to} to={to} end={to === '/'} className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>
+                      {label}
+                    </NavLink>
+                  ))}
+                </div>
+              ))}
+            </nav>
+
+            <div className="sidebar__bottom">
+              <div className="nav-section__title nav-section__title--account">Аккаунт</div>
+              <div className="account-links">
+                <NavLink to="/notifications" className={({ isActive }) => isActive ? 'nav-item active nav-item--with-badge' : 'nav-item nav-item--with-badge'}>
+                  <span>Уведомления</span>
+                  {unreadCount > 0 ? <span className="nav-unread-badge" aria-label={`Непрочитанных: ${unreadCount}`}>{unreadCount > 99 ? '99+' : unreadCount}</span> : null}
+                </NavLink>
+                {user?.role !== 'Student' ? <NavLink to="/profile" className={({ isActive }) => isActive ? 'nav-item active' : 'nav-item'}>Профиль</NavLink> : null}
+                <button className="nav-item nav-button" onClick={() => void logout()}>Выйти</button>
+              </div>
+              <div className="user-block">
+                <strong>{user?.displayName}</strong>
+                <span>{user ? roleLabels[user.role] : ''}</span>
+              </div>
+            </div>
+          </>
+        ) : null}
       </aside>
       <main className="main-content">
         <Outlet />

@@ -54,7 +54,7 @@ export function TeacherExamsPage() {
 
   return (
     <div>
-      <PageHeader eyebrow="Контроль знаний" title="Режим «Экзамен»" description="Используйте готовую диагностику как экзамен: назначьте всех студентов, конкретного студента или учебную группу и задайте лимит времени." />
+      <PageHeader eyebrow="Контроль знаний" title="Режим Экзамен" description="Используйте готовую диагностику как экзамен: назначьте всех студентов, конкретного студента или учебную группу и задайте лимит времени." />
       <section className="two-column edtech-two-column">
         <form className="panel" onSubmit={submit}>
           <h2>Создать экзамен</h2>

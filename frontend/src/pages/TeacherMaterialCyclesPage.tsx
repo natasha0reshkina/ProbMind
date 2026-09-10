@@ -127,7 +127,7 @@ export function TeacherMaterialCyclesPage() {
                     <dt>Среднее изменение</dt>
                     <dd>
                       {cycle.meanDelta == null
-                        ? '—'
+                        ? '-'
                         : `${cycle.meanDelta >= 0 ? '+' : ''}${Math.round(cycle.meanDelta * 100)} п.п.`}
                     </dd>
                   </div>

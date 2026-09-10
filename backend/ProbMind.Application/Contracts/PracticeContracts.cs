@@ -22,7 +22,9 @@ public sealed record PracticeSessionDto(
     int TargetExercises,
     int CompletedExercises,
     DateTimeOffset? StartedAt,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt,
+    int CorrectAnswers = 0,
+    int IncorrectAnswers = 0);
 
 public sealed record PracticeResultDto(
     PracticeSessionDto Session,

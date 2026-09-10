@@ -7,8 +7,8 @@ import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import type { MisconceptionCatalog, QuestionDetail, Topic } from '../types/api'
 
-const kindLabels: Record<string, string> = { Diagnostic: 'Диагностическое', Corrective: 'Коррекционное', Transfer: 'Перенос', MasteryCheck: 'Контрольное' }
-const difficultyLabels: Record<string, string> = { Introductory: 'Вводная', Basic: 'Базовая', Intermediate: 'Средняя', Advanced: 'Высокая', Transfer: 'Перенос' }
+const kindLabels: Record<string, string> = { Diagnostic: 'Диагностическое', Corrective: 'Коррекционное', Transfer: 'Применение в новой ситуации', MasteryCheck: 'Контрольное' }
+const difficultyLabels: Record<string, string> = { Introductory: 'Вводная', Basic: 'Базовая', Intermediate: 'Средняя', Advanced: 'Высокая', Transfer: 'Применение в новой ситуации' }
 
 interface OptionDraft {
   text: string
@@ -181,7 +181,7 @@ export function QuestionEditorPage() {
                   {['Introductory', 'Basic', 'Intermediate', 'Advanced', 'Transfer'].map((difficulty) => <option key={difficulty} value={difficulty}>{difficultyLabels[difficulty]}</option>)}
                 </select>
               </label>
-              <label className="checkbox-label editor-checkbox"><input type="checkbox" checked={state.isTransfer} onChange={(event) => setState((current) => ({ ...current, isTransfer: event.target.checked }))} /> Задание на перенос</label>
+              <label className="checkbox-label editor-checkbox"><input type="checkbox" checked={state.isTransfer} onChange={(event) => setState((current) => ({ ...current, isTransfer: event.target.checked }))} /> Применение в новой ситуации</label>
             </div>
           </section>
 
@@ -254,7 +254,7 @@ export function QuestionEditorPage() {
             {!isNew && detail.data && (
               <div className="version-meta">
                 <span>Текущая версия</span><strong>v{detail.data.currentVersion.versionNumber}</strong>
-                <span>Тема</span><strong>{selectedTopic?.nameRu ?? '—'}</strong>
+                <span>Тема</span><strong>{selectedTopic?.nameRu ?? '-'}</strong>
                 <span>Статус</span><StatusBadge value={detail.data.question.status} />
               </div>
             )}

@@ -140,7 +140,7 @@ export function TeacherMaterialsPage() {
                 </label>
                 <div className="button-row">
                   <button className="primary-button" type="button" disabled={respond.isPending} onClick={() => respond.mutate({ itemId: item.id, response: responseValue(item), discussInClass: item.discussInClass })}>Отправить ответ</button>
-                  <button className="secondary-button" type="button" disabled={respond.isPending} onClick={() => respond.mutate({ itemId: item.id, response: responseValue(item), discussInClass: !item.discussInClass })}>{item.discussInClass ? 'Снять пометку «разберём на паре»' : 'Разберём на паре'}</button>
+                  <button className="secondary-button" type="button" disabled={respond.isPending} onClick={() => respond.mutate({ itemId: item.id, response: responseValue(item), discussInClass: !item.discussInClass })}>{item.discussInClass ? 'Снять пометку разберём на паре' : 'Разберём на паре'}</button>
                 </div>
                 {item.discussInClass ? <div className="study-class-marker">Отмечено для разбора на паре</div> : null}
               </article>

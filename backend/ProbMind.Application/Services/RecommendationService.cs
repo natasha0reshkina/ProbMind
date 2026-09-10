@@ -72,9 +72,9 @@ public sealed class RecommendationService : IRecommendationService
                     : RecommendationType.StartCorrection,
                 Priority = Math.Clamp(0.45d + state.Confidence * 0.55d, 0d, 1d),
                 Title = state.Status == MisconceptionStatus.RecheckRequired
-                    ? $"Перепроверьте: {mc.Title}"
-                    : $"Исправьте заблуждение: {mc.Title}",
-                Rationale = $"Паттерн ошибки подтверждён предыдущими ответами. Диагностическая уверенность — {state.Confidence:P0}.",
+                    ? $"Проверьте ещё раз: {mc.Title}"
+                    : $"Разберите ошибку: {mc.Title}",
+                Rationale = $"Ошибка повторялась в предыдущих ответах. Уровень подтверждения: {state.Confidence:P0}.",
                 GeneratedAt = _clock.UtcNow
             });
         }
@@ -92,8 +92,8 @@ public sealed class RecommendationService : IRecommendationService
                     ? RecommendationType.ReviewTheory
                     : RecommendationType.ContinuePractice,
                 Priority = Math.Clamp(1d - mastery.Mastery, 0d, 1d) * 0.8d,
-                Title = $"Повторите тему «{topic.NameRu}»",
-                Rationale = $"Текущий уровень освоения: {mastery.Mastery:P0}; неопределённость оценки: {mastery.Uncertainty:P0}.",
+                Title = $"Повторите тему: {topic.NameRu}",
+                Rationale = $"Освоение темы: {mastery.Mastery:P0}. Неопределённость оценки: {mastery.Uncertainty:P0}.",
                 GeneratedAt = _clock.UtcNow
             });
         }

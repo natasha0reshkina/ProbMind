@@ -11,8 +11,8 @@ const evidenceLabels: Record<string, string> = {
   Distractor: 'Характерный ошибочный ответ',
   CorrectAnswer: 'Правильный ответ',
   CorrectionSuccess: 'Успешная коррекционная практика',
-  TransferSuccess: 'Успешное задание на перенос',
-  TransferFailure: 'Ошибка в задании на перенос',
+  TransferSuccess: 'Успешное применение в новой ситуации',
+  TransferFailure: 'Ошибка при применении в новой ситуации',
   ManualTeacherEvidence: 'Наблюдение преподавателя',
 }
 
@@ -43,7 +43,7 @@ export function MisconceptionDetailPage() {
           <ProgressBar value={data.state.confidence} />
         </div>
         <p>{data.reasoning.summary}</p>
-        <p><strong>Следующий шаг:</strong> {data.reasoning.nextAction}</p>
+        <p><strong>Что делать дальше:</strong> {data.reasoning.nextAction}</p>
       </section>
 
       <div className="two-column">

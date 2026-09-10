@@ -43,8 +43,13 @@ public sealed class TeacherService : ITeacherService
         var misconceptions = await _uow.UserMisconceptions.ListAsync(ct);
         var misconceptionCatalog = (await _uow.Misconceptions.ListAsync(ct)).ToDictionary(x => x.Id);
         var diagnostics = await _uow.DiagnosticSessions.ListAsync(ct);
-        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, null, ct);
+        var answers = (await _uow.DiagnosticAnswers.ListAsync(ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var events = await _uow.ActivityEvents.ListAsync(ct);
+        var groups = (await _uow.StudentGroups.ListAsync(ct)).ToDictionary(x => x.Id, x => x.Name);
+        var memberships = await _uow.StudentGroupMembers.ListAsync(ct);
 
         return students
             .Select(student =>
@@ -83,7 +88,13 @@ public sealed class TeacherService : ITeacherService
                     wrong,
                     accuracy,
                     activeTitles,
-                    lastActivity);
+                    lastActivity,
+                    memberships
+                        .Where(x => x.StudentId == student.Id && groups.ContainsKey(x.GroupId))
+                        .Select(x => groups[x.GroupId])
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(x => x)
+                        .ToArray());
             })
             .OrderByDescending(x => x.WrongAnswers)
             .ThenBy(x => x.DiagnosticAccuracy)
@@ -103,6 +114,14 @@ public sealed class TeacherService : ITeacherService
         var diagnostics = await _uow.DiagnosticSessions.WhereAsync(x => x.UserId == studentId, ct);
         var practice = await _uow.PracticeSessions.WhereAsync(x => x.UserId == studentId, ct);
         var events = await _uow.ActivityEvents.WhereAsync(x => x.UserId == studentId, ct);
+        var memberships = await _uow.StudentGroupMembers.WhereAsync(x => x.StudentId == studentId, ct);
+        var groupIds = memberships.Select(x => x.GroupId).ToHashSet();
+        var groupNames = (await _uow.StudentGroups.ListAsync(ct))
+            .Where(x => groupIds.Contains(x.Id))
+            .Select(x => x.Name)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(x => x)
+            .ToArray();
 
         return new StudentOverviewDto(
             student.Id,
@@ -116,6 +135,7 @@ public sealed class TeacherService : ITeacherService
             diagnostics.Count(x => x.Status == DiagnosticStatus.ReportReady),
             practice.Count(x => x.Status == PracticeStatus.Completed),
             events.OrderByDescending(x => x.OccurredAt).Select(x => (DateTimeOffset?)x.OccurredAt).FirstOrDefault(),
+            groupNames,
             topics,
             misconceptions);
     }
@@ -130,9 +150,11 @@ public sealed class TeacherService : ITeacherService
         if (student.Role != UserRole.Student)
             throw new InvalidOperationException("Указанная учётная запись не принадлежит студенту.");
 
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, studentId, ct);
         var diagnostic = (await _uow.DiagnosticAnswers.WhereAsync(
                 x => x.UserId == studentId && !x.IsCorrect,
                 ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
             .Select(x => (x.Id, x.SubmittedAt, x.QuestionId, x.QuestionVersionId, x.AnswerOptionId, Source: "Диагностика"));
         var practice = (await _uow.PracticeAttempts.WhereAsync(
                 x => x.UserId == studentId && !x.IsCorrect,
@@ -199,9 +221,11 @@ public sealed class TeacherService : ITeacherService
         if (student.Role != UserRole.Student)
             throw new InvalidOperationException("Указанная учётная запись не принадлежит студенту.");
 
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, studentId, ct);
         var diagnostic = (await _uow.DiagnosticAnswers.WhereAsync(
                 x => x.UserId == studentId && x.StudentNote != null && x.StudentNote != string.Empty,
                 ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
             .Select(x => (x.Id, x.SubmittedAt, x.QuestionId, x.QuestionVersionId, Note: x.StudentNote!, x.IsCorrect, Source: "Диагностика"));
         var practice = (await _uow.PracticeAttempts.WhereAsync(
                 x => x.UserId == studentId && x.StudentNote != null && x.StudentNote != string.Empty,
@@ -250,7 +274,10 @@ public sealed class TeacherService : ITeacherService
         CancellationToken ct = default)
     {
         var questions = await _uow.Questions.ListAsync(ct);
-        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, null, ct);
+        var answers = (await _uow.DiagnosticAnswers.ListAsync(ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var attempts = await _uow.PracticeAttempts.ListAsync(ct);
         var options = await _uow.AnswerOptions.ListAsync(ct);
         var masteries = await _uow.TopicMasteries.ListAsync(ct);
@@ -350,7 +377,10 @@ public sealed class TeacherService : ITeacherService
         var sessions = await _uow.DiagnosticSessions.WhereAsync(
             x => x.Status == DiagnosticStatus.ReportReady,
             ct);
-        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, null, ct);
+        var answers = (await _uow.DiagnosticAnswers.ListAsync(ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
 
         var vectors = sessions
             .Select(session =>

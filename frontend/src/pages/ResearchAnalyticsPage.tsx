@@ -58,17 +58,17 @@ export function ResearchAnalyticsPage() {
 
       <KpiStrip items={[
         { label: 'Пар с достаточными данными', value: edges.length },
-        { label: 'Средняя сила связи', value: meanLift == null ? '—' : `${number(meanLift, 1)} раза` },
-        { label: 'Максимальная сила связи', value: maxLift == null ? '—' : `${number(maxLift, 1)} раза` },
+        { label: 'Средняя сила связи', value: meanLift == null ? '-' : `${number(meanLift, 1)} раза` },
+        { label: 'Максимальная сила связи', value: maxLift == null ? '-' : `${number(maxLift, 1)} раза` },
         { label: 'Групп профилей', value: clusters.data?.length ?? 0 },
-        { label: 'Ошибка калибровки', value: calibration.data ? number(calibration.data.brierScore, 3) : '—' },
+        { label: 'Ошибка калибровки', value: calibration.data ? number(calibration.data.brierScore, 3) : '-' },
       ]} />
 
       <section className="panel">
         <div className="panel-title">
           <div>
-            <h2>Совместная встречаемость типичных ошибок</h2>
-            <p className="muted chart-subtitle">Пара отображается только тогда, когда оба типа ошибки встречаются минимум у двух студентов. Это убирает ложные «сильные связи», возникающие из одного наблюдения.</p>
+            <h2>Совместная встречаемость типичных затруднений</h2>
+            <p className="muted chart-subtitle">Пара отображается только тогда, когда оба типа ошибки встречаются минимум у двух студентов. Это убирает ложные сильные связи, возникающие из одного наблюдения.</p>
           </div>
           <Network size={20} />
         </div>
@@ -77,9 +77,9 @@ export function ResearchAnalyticsPage() {
           columns={columns}
           rowKey={(row) => `${row.misconceptionAId}-${row.misconceptionBId}`}
           searchText={(row) => `${row.misconceptionATitle} ${row.misconceptionBTitle}`}
-          searchPlaceholder="Название типичной ошибки…"
+          searchPlaceholder="Название типичного затруднения…"
           pageSize={12}
-          emptyText="Пока недостаточно данных для надёжного сравнения типичных ошибок между студентами"
+          emptyText="Пока недостаточно данных для надёжного сравнения типичных затруднений между студентами"
         />
       </section>
 

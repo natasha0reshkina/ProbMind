@@ -1,9 +1,7 @@
 import { ReactNode } from 'react'
 
 export function PageHeader({
-  eyebrow,
   title,
-  description,
   actions,
 }: {
   eyebrow?: string
@@ -13,11 +11,7 @@ export function PageHeader({
 }) {
   return (
     <header className="page-header">
-      <div>
-        {eyebrow ? <div className="eyebrow">{eyebrow}</div> : null}
-        <h1>{title}</h1>
-        {description ? <p>{description}</p> : null}
-      </div>
+      <h1>{title}</h1>
       {actions ? <div className="page-header__actions">{actions}</div> : null}
     </header>
   )

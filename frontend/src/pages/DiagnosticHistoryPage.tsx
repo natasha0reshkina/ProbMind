@@ -71,17 +71,17 @@ export function DiagnosticHistoryPage() {
               <tbody>
                 {(history.data ?? []).map((item) => (
                   <tr key={item.id}>
-                    <td>{item.startedAt ? new Date(item.startedAt).toLocaleString('ru-RU') : '—'}</td>
+                    <td>{item.startedAt ? new Date(item.startedAt).toLocaleString('ru-RU') : '-'}</td>
                     <td><StatusBadge value={item.status} /></td>
                     <td>{item.answeredQuestionCount} / {item.plannedQuestionCount}</td>
-                    <td>{item.overallScore == null ? '—' : percent(item.overallScore)}</td>
+                    <td>{item.overallScore == null ? '-' : percent(item.overallScore)}</td>
                     <td>
                       {item.status === 'ReportReady' ? (
                         <Link className="secondary-button history-action-button" to={`/diagnostics/${item.id}/report`}>Открыть отчёт</Link>
                       ) : item.status === 'InProgress' ? (
                         <Link className="primary-button history-action-button" to={`/diagnostics/${item.id}/continue`}>Продолжить</Link>
                       ) : (
-                        '—'
+                        '-'
                       )}
                     </td>
                   </tr>
@@ -103,7 +103,7 @@ export function DiagnosticHistoryPage() {
               <select value={effectiveFrom} onChange={(event) => setFromId(event.target.value)}>
                 {completed.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {new Date(item.completedAt ?? item.startedAt ?? '').toLocaleString('ru-RU')} · {item.overallScore == null ? '—' : percent(item.overallScore)}
+                    {new Date(item.completedAt ?? item.startedAt ?? '').toLocaleString('ru-RU')} · {item.overallScore == null ? '-' : percent(item.overallScore)}
                   </option>
                 ))}
               </select>
@@ -113,7 +113,7 @@ export function DiagnosticHistoryPage() {
               <select value={effectiveTo} onChange={(event) => setToId(event.target.value)}>
                 {completed.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {new Date(item.completedAt ?? item.startedAt ?? '').toLocaleString('ru-RU')} · {item.overallScore == null ? '—' : percent(item.overallScore)}
+                    {new Date(item.completedAt ?? item.startedAt ?? '').toLocaleString('ru-RU')} · {item.overallScore == null ? '-' : percent(item.overallScore)}
                   </option>
                 ))}
               </select>
@@ -128,7 +128,7 @@ export function DiagnosticHistoryPage() {
             <>
               <dl className="summary-list comparison-summary">
                 <div><dt>Изменение точности</dt><dd>{signedPercent(comparison.data.accuracyDelta)}</dd></div>
-                <div><dt>Типичных ошибок в отчёте</dt><dd>{comparison.data.from.detectedMisconceptions} → {comparison.data.to.detectedMisconceptions}</dd></div>
+                <div><dt>Типичных затруднений в отчёте</dt><dd>{comparison.data.from.detectedMisconceptions} → {comparison.data.to.detectedMisconceptions}</dd></div>
               </dl>
               <div className="table-frame">
                 <table className="academic-table">
@@ -137,9 +137,9 @@ export function DiagnosticHistoryPage() {
                     {comparison.data.topics.map((topic) => (
                       <tr key={topic.topicId}>
                         <td>{topic.name}</td>
-                        <td>{topic.fromMastery == null ? '—' : percent(topic.fromMastery)}</td>
-                        <td>{topic.toMastery == null ? '—' : percent(topic.toMastery)}</td>
-                        <td>{topic.delta == null ? '—' : signedPercent(topic.delta)}</td>
+                        <td>{topic.fromMastery == null ? '-' : percent(topic.fromMastery)}</td>
+                        <td>{topic.toMastery == null ? '-' : percent(topic.toMastery)}</td>
+                        <td>{topic.delta == null ? '-' : signedPercent(topic.delta)}</td>
                       </tr>
                     ))}
                   </tbody>

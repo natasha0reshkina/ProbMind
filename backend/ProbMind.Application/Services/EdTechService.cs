@@ -22,49 +22,30 @@ public sealed class EdTechService : IEdTechService
     public async Task<IReadOnlyList<SpacedReviewDto>> RepetitionAsync(Guid userId, CancellationToken ct = default)
     {
         await RequireStudentAsync(userId, ct);
-        var topics = (await _uow.Topics.ListAsync(ct)).Where(x => x.Status == ContentStatus.Published).OrderBy(x => x.SortOrder).ToArray();
+        var topics = (await _uow.Topics.ListAsync(ct))
+            .Where(x => x.Status == ContentStatus.Published)
+            .OrderBy(x => x.SortOrder)
+            .ToArray();
         var mastery = (await _uow.TopicMasteries.WhereAsync(x => x.UserId == userId, ct)).ToDictionary(x => x.TopicId);
         var existing = (await _uow.SpacedReviewItems.WhereAsync(x => x.UserId == userId, ct)).ToDictionary(x => x.TopicId);
-        var changed = false;
-
-        foreach (var topic in topics)
-        {
-            if (existing.ContainsKey(topic.Id))
-                continue;
-            var value = mastery.TryGetValue(topic.Id, out var m) ? m.Mastery : 0.5d;
-            var delay = value < .45d ? 0 : value < .65d ? 1 : value < .8d ? 3 : 7;
-            var item = new SpacedReviewItem
-            {
-                UserId = userId,
-                TopicId = topic.Id,
-                NextReviewAt = _clock.UtcNow.AddDays(delay),
-                IntervalDays = Math.Max(1, delay)
-            };
-            await _uow.SpacedReviewItems.AddAsync(item, ct);
-            existing[topic.Id] = item;
-            changed = true;
-        }
-
-        if (changed)
-            await _uow.SaveChangesAsync(ct);
 
         return topics.Select(topic =>
         {
-            var item = existing[topic.Id];
+            existing.TryGetValue(topic.Id, out var item);
             var value = mastery.TryGetValue(topic.Id, out var m) ? m.Mastery : 0.5d;
             return new SpacedReviewDto(
                 topic.Id,
                 topic.Code,
                 topic.NameRu,
                 value,
-                item.NextReviewAt,
-                item.LastReviewedAt,
-                item.IntervalDays,
-                item.Repetitions,
-                item.NextReviewAt <= _clock.UtcNow);
+                item?.NextReviewAt,
+                item?.LastReviewedAt,
+                item?.IntervalDays ?? 0,
+                item?.Repetitions ?? 0,
+                item is not null && item.NextReviewAt <= _clock.UtcNow);
         })
         .OrderByDescending(x => x.IsDue)
-        .ThenBy(x => x.NextReviewAt)
+        .ThenBy(x => x.NextReviewAt ?? DateTimeOffset.MaxValue)
         .ToArray();
     }
 
@@ -79,7 +60,7 @@ public sealed class EdTechService : IEdTechService
         if (quality < 3)
         {
             item.Repetitions = 0;
-            item.IntervalDays = 1;
+            item.IntervalDays = 0;
             item.EaseFactor = Math.Max(1.3d, item.EaseFactor - .2d);
         }
         else
@@ -340,6 +321,8 @@ public sealed class EdTechService : IEdTechService
                     QuestionVersion? version = null;
                     if (answer is not null)
                         versionsById.TryGetValue(answer.QuestionVersionId, out version);
+                    if (version is null && templateQuestion.QuestionVersionId.HasValue)
+                        versionsById.TryGetValue(templateQuestion.QuestionVersionId.Value, out version);
                     if (version is null)
                         currentVersions.TryGetValue(templateQuestion.QuestionId, out version);
 
@@ -347,7 +330,7 @@ public sealed class EdTechService : IEdTechService
                         ? selectedOption.Text
                         : null;
                     var correct = version is null
-                        ? "—"
+                        ? "-"
                         : string.Join(" / ", options
                             .Where(x => x.QuestionVersionId == version.Id && x.IsCorrect)
                             .OrderBy(x => x.SortOrder)
@@ -357,7 +340,7 @@ public sealed class EdTechService : IEdTechService
                         templateQuestion.Position,
                         version?.Prompt ?? "Задание недоступно",
                         selected,
-                        string.IsNullOrWhiteSpace(correct) ? "—" : correct,
+                        string.IsNullOrWhiteSpace(correct) ? "-" : correct,
                         answer?.IsCorrect,
                         answer?.ConfidenceLevel,
                         answer?.Reasoning,
@@ -443,6 +426,16 @@ public sealed class EdTechService : IEdTechService
         if (existing is not null)
             return new ExamStartDto(exam.Id, existing.DiagnosticSessionId, exam.TimeLimitMinutes, existing.StartedAt, existing.StartedAt.AddMinutes(exam.TimeLimitMinutes));
 
+        var activeExam = await ExamSessionRules.ActiveAttemptAsync(_uow, userId, ct);
+        if (activeExam is not null)
+            throw new InvalidOperationException("Сначала завершите уже начатый экзамен.");
+
+        var activePractice = await _uow.PracticeSessions.AnyAsync(
+            x => x.UserId == userId && (x.Status == PracticeStatus.Created || x.Status == PracticeStatus.InProgress),
+            ct);
+        if (activePractice)
+            throw new InvalidOperationException("Сначала завершите текущую практику.");
+
         var session = await _diagnostics.StartTemplateAsync(userId, exam.DiagnosticTemplateId, ct);
         var attempt = new ExamAttempt
         {
@@ -470,7 +463,10 @@ public sealed class EdTechService : IEdTechService
         await RequireStudentAsync(userId, ct);
 
         var diagnostics = await _uow.DiagnosticSessions.WhereAsync(x => x.UserId == userId && x.Status == DiagnosticStatus.ReportReady, ct);
-        var diagnosticAnswers = await _uow.DiagnosticAnswers.WhereAsync(x => x.UserId == userId, ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, userId, ct);
+        var diagnosticAnswers = (await _uow.DiagnosticAnswers.WhereAsync(x => x.UserId == userId, ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var practiceAttempts = await _uow.PracticeAttempts.WhereAsync(x => x.UserId == userId, ct);
         var mastery = await _uow.TopicMasteries.WhereAsync(x => x.UserId == userId, ct);
         var masteryHistory = await _uow.TopicMasteryHistory.WhereAsync(x => x.UserId == userId, ct);
@@ -485,7 +481,7 @@ public sealed class EdTechService : IEdTechService
             .ToArray();
 
         var streak = LongestStreak(activeDays);
-        var answers = diagnosticAnswers.Count + practiceAttempts.Count;
+        var answers = diagnosticAnswers.Length + practiceAttempts.Count;
         var transferCorrect = practiceAttempts.Count(x => x.ExerciseType == ExerciseType.Transfer && x.IsCorrect);
         var masteredTopicIds = mastery
             .Where(x => x.ObservationCount > 0 && x.Mastery >= .8d)
@@ -504,66 +500,19 @@ public sealed class EdTechService : IEdTechService
             new { Code = "mastery_80", Title = "Тема освоена", Description = "Довести хотя бы одну тему до 80% освоения.", Progress = masteredTopics, Target = 1 },
             new { Code = "streak_3", Title = "Три дня подряд", Description = "Учиться три дня подряд.", Progress = streak, Target = 3 },
             new { Code = "streak_7", Title = "Неделя ритма", Description = "Учиться семь дней подряд.", Progress = streak, Target = 7 },
-            new { Code = "corrected", Title = "Исправленная ошибка", Description = "Довести типичную ошибку до статуса «исправлена».", Progress = corrected, Target = 1 },
-            new { Code = "transfer_3", Title = "Перенос знания", Description = "Правильно решить три задания на перенос.", Progress = transferCorrect, Target = 3 }
+            new { Code = "corrected", Title = "Исправленная ошибка", Description = "Довести типичную ошибку до статуса исправлена.", Progress = corrected, Target = 1 },
+            new { Code = "transfer_3", Title = "Применение знания", Description = "Правильно решить три задания, где знание применяется в новой ситуации.", Progress = transferCorrect, Target = 3 }
         };
 
-        var stored = (await _uow.StudentAchievements.WhereAsync(x => x.UserId == userId, ct))
-            .ToDictionary(x => x.Code, StringComparer.OrdinalIgnoreCase);
-        var changed = false;
-
-        foreach (var item in catalogue)
-        {
-            if (!stored.TryGetValue(item.Code, out var achievement))
-            {
-                achievement = new StudentAchievement
-                {
-                    UserId = userId,
-                    Code = item.Code,
-                    Progress = Math.Max(0, item.Progress),
-                    Target = item.Target
-                };
-                if (achievement.Progress >= achievement.Target)
-                    achievement.UnlockedAt = _clock.UtcNow;
-                await _uow.StudentAchievements.AddAsync(achievement, ct);
-                stored[item.Code] = achievement;
-                changed = true;
-                continue;
-            }
-
-            var nextProgress = Math.Max(0, item.Progress);
-            if (achievement.Progress != nextProgress || achievement.Target != item.Target)
-            {
-                achievement.Progress = nextProgress;
-                achievement.Target = item.Target;
-                achievement.Touch();
-                _uow.StudentAchievements.Update(achievement);
-                changed = true;
-            }
-            var shouldBeUnlocked = achievement.Progress >= achievement.Target;
-            if (shouldBeUnlocked && !achievement.UnlockedAt.HasValue)
-            {
-                achievement.UnlockedAt = _clock.UtcNow;
-                achievement.Touch();
-                _uow.StudentAchievements.Update(achievement);
-                changed = true;
-            }
-        }
-
-        if (changed)
-            await _uow.SaveChangesAsync(ct);
-
         return catalogue.Select(item =>
-        {
-            var achievement = stored[item.Code];
-            return new AchievementDto(
+            new AchievementDto(
                 item.Code,
                 item.Title,
                 item.Description,
-                achievement.UnlockedAt.HasValue,
+                item.Progress >= item.Target,
                 Math.Min(Math.Max(0, item.Progress), item.Target),
-                item.Target);
-        }).ToArray();
+                item.Target))
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<MaterialStudyCycleDto>> StudentMaterialCyclesAsync(Guid userId, CancellationToken ct = default)
@@ -701,7 +650,10 @@ public sealed class EdTechService : IEdTechService
 
     private async Task<IReadOnlyList<ConfidenceAnswerDto>> BuildConfidenceAnswersAsync(Guid userId, CancellationToken ct)
     {
-        var diagnostic = await _uow.DiagnosticAnswers.WhereAsync(x => x.UserId == userId && x.ConfidenceLevel.HasValue, ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, userId, ct);
+        var diagnostic = (await _uow.DiagnosticAnswers.WhereAsync(x => x.UserId == userId && x.ConfidenceLevel.HasValue, ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var practice = await _uow.PracticeAttempts.WhereAsync(x => x.UserId == userId && x.ConfidenceLevel.HasValue, ct);
         var questions = (await _uow.Questions.ListAsync(ct)).ToDictionary(x => x.Id);
         var versions = (await _uow.QuestionVersions.ListAsync(ct)).ToDictionary(x => x.Id);

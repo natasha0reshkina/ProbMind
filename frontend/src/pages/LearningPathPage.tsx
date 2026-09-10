@@ -5,13 +5,12 @@ import { PageHeader } from '../components/PageHeader'
 import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../auth/AuthContext'
 import type { LearningPath } from '../types/api'
+import { cleanUiText } from '../utils/format'
 
 function localizedReason(reason: string) {
-  return reason
-    .replace(': confidence in «', ': уверенность в наличии ошибки «')
-    .replace(/» is\s*([0-9]+)\s*%; mastery\s*([0-9]+)\s*%\.?/gi, '» — $1%; освоение темы — $2%.')
-    .replace(': topic mastery is ', ': освоение темы — ')
-    .replace(/; spaced-review priority\s*([0-9]+)\s*%\.?/gi, '; приоритет повторения — $1%.')
+  return cleanUiText(reason)
+    .replace('уверенность в наличии ошибки ', 'ошибка ')
+    .replace('Диагностическая уверенность', 'Уровень подтверждения')
 }
 
 export function LearningPathPage() {
@@ -19,7 +18,7 @@ export function LearningPathPage() {
   const client = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['learning-path', user?.id],
-    queryFn: async () => (await api.get<LearningPath>('/learning-paths/current')).data,
+    queryFn: async () => (await api.get<LearningPath | null>('/learning-paths/current')).data,
   })
 
   const rebuild = useMutation({
@@ -33,7 +32,20 @@ export function LearningPathPage() {
     onSuccess: (path) => client.setQueryData(['learning-path', user?.id], path),
   })
 
-  if (isLoading || !data) return <LoadingView />
+  if (isLoading) return <LoadingView />
+
+  if (!data) {
+    return (
+      <div>
+        <PageHeader title="План повторения" />
+        <section className="plain-section">
+          <h2>План ещё не сформирован</h2>
+          <p className="muted">Сформируйте его после диагностики или практики.</p>
+          <button className="primary-button" onClick={() => rebuild.mutate()} disabled={rebuild.isPending}>{rebuild.isPending ? 'Формируем…' : 'Сформировать план'}</button>
+        </section>
+      </div>
+    )
+  }
 
   return (
     <div>

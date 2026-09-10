@@ -86,12 +86,25 @@ public sealed class GamificationService : IGamificationService
 
     public async Task<bool> SetLeaderboardEnabledAsync(bool enabled, CancellationToken ct = default)
     {
-        var settings = await SettingsAsync(ct);
-        settings.LeaderboardEnabled = enabled;
-        settings.Touch();
-        _uow.GamificationSettings.Update(settings);
+        var existing = await _uow.GamificationSettings.GetByIdAsync(SettingsId, ct);
+        if (existing is null)
+        {
+            existing = new GamificationSettings
+            {
+                Id = SettingsId,
+                LeaderboardEnabled = enabled
+            };
+            await _uow.GamificationSettings.AddAsync(existing, ct);
+        }
+        else
+        {
+            existing.LeaderboardEnabled = enabled;
+            existing.Touch();
+            _uow.GamificationSettings.Update(existing);
+        }
+
         await _uow.SaveChangesAsync(ct);
-        return settings.LeaderboardEnabled;
+        return existing.LeaderboardEnabled;
     }
 
     private async Task<User> RequireStudentAsync(Guid userId, CancellationToken ct)
@@ -105,18 +118,12 @@ public sealed class GamificationService : IGamificationService
 
     private async Task<GamificationSettings> SettingsAsync(CancellationToken ct)
     {
-        var existing = await _uow.GamificationSettings.GetByIdAsync(SettingsId, ct);
-        if (existing is not null)
-            return existing;
-
-        var settings = new GamificationSettings
-        {
-            Id = SettingsId,
-            LeaderboardEnabled = true
-        };
-        await _uow.GamificationSettings.AddAsync(settings, ct);
-        await _uow.SaveChangesAsync(ct);
-        return settings;
+        return await _uow.GamificationSettings.GetByIdAsync(SettingsId, ct)
+            ?? new GamificationSettings
+            {
+                Id = SettingsId,
+                LeaderboardEnabled = true
+            };
     }
 
     private async Task<IReadOnlyList<StudentStats>> BuildStatsAsync(CancellationToken ct)
@@ -124,7 +131,10 @@ public sealed class GamificationService : IGamificationService
         var students = await _uow.Users.WhereAsync(x => x.Role == UserRole.Student && x.IsActive && !x.Email.EndsWith("@probmind.test"), ct);
         var events = await _uow.ActivityEvents.ListAsync(ct);
         var masteries = await _uow.TopicMasteries.ListAsync(ct);
-        var diagnosticAnswers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, null, ct);
+        var diagnosticAnswers = (await _uow.DiagnosticAnswers.ListAsync(ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var diagnosticSessions = await _uow.DiagnosticSessions.ListAsync(ct);
         var practiceAttempts = await _uow.PracticeAttempts.ListAsync(ct);
         var practiceSessions = await _uow.PracticeSessions.ListAsync(ct);

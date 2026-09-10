@@ -233,11 +233,11 @@ public sealed class LearnerModelService : ILearnerModelService
                             ? NotificationType.CorrectionCompleted
                             : NotificationType.MisconceptionDetected,
                         Title = state.Status == MisconceptionStatus.Corrected
-                            ? "Ошибка скорректирована"
-                            : "Обнаружен устойчивый паттерн ошибки",
+                            ? "Ошибка исправлена"
+                            : "Найдена повторяющаяся ошибка",
                         Body = state.Status == MisconceptionStatus.Corrected
-                            ? $"Паттерн «{misconception.Title}» больше не подтверждается последними ответами."
-                            : $"В нескольких ответах повторяется паттерн «{misconception.Title}». Уверенность диагностики — {state.Confidence:P0}."
+                            ? $"Ошибка {misconception.Title} больше не повторяется в последних ответах."
+                            : $"Ошибка {misconception.Title} повторилась в нескольких ответах. Уровень подтверждения: {state.Confidence:P0}."
                     }, ct);
                 }
             }
@@ -256,9 +256,12 @@ public sealed class LearnerModelService : ILearnerModelService
         var versions = await _uow.QuestionVersions.ListAsync(ct);
         var versionsById = versions.ToDictionary(x => x.Id);
 
-        var diagnosticAnswers = await _uow.DiagnosticAnswers.WhereAsync(
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, userId, ct);
+        var diagnosticAnswers = (await _uow.DiagnosticAnswers.WhereAsync(
             x => x.UserId == userId,
-            ct);
+            ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var practiceAttempts = await _uow.PracticeAttempts.WhereAsync(
             x => x.UserId == userId,
             ct);

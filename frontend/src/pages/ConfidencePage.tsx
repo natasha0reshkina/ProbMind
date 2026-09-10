@@ -14,7 +14,7 @@ const confidenceOptions = [
 ] as const
 
 const allConfidenceLevels = confidenceOptions.map((item) => item.value)
-const confidenceLabel = (value: number) => confidenceOptions.find((item) => item.value === value)?.label ?? '—'
+const confidenceLabel = (value: number) => confidenceOptions.find((item) => item.value === value)?.label ?? '-'
 
 export function ConfidencePage() {
   const { user } = useAuth()
@@ -58,7 +58,7 @@ export function ConfidencePage() {
       />
       <section className="kpi-strip edtech-kpi-strip">
         <div><span>Ответов с оценкой</span><strong>{data.answersWithConfidence}</strong></div>
-        <div><span>Средняя уверенность</span><strong>{data.meanConfidence ? data.meanConfidence.toFixed(1) : '—'} / 4</strong></div>
+        <div><span>Средняя уверенность</span><strong>{data.meanConfidence ? data.meanConfidence.toFixed(1) : '-'} / 4</strong></div>
         <div><span>Точность</span><strong>{Math.round(data.accuracy * 100)}%</strong></div>
         <div><span>Полностью уверен, но неверно</span><strong>{data.overconfidentWrong}</strong></div>
       </section>
@@ -92,7 +92,7 @@ export function ConfidencePage() {
         <div className="section-heading-row">
           <div>
             <h2>История ответов по темам</h2>
-            <p className="muted">Задания разделены на тематические блоки, чтобы было видно, в каких темах уверенность совпадает с результатом, а в каких — нет.</p>
+            <p className="muted">Задания разделены на тематические блоки, чтобы было видно, в каких темах уверенность совпадает с результатом, а в каких - нет.</p>
           </div>
           <span className="topic-count-badge">{filteredAnswers.length} ответов · {groupedAnswers.length} тем</span>
         </div>

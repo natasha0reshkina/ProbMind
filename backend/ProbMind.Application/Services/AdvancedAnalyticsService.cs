@@ -47,7 +47,10 @@ public sealed class AdvancedAnalyticsService : IAdvancedAnalyticsService
             .Where(x => x.Status == ContentStatus.Published && (topicId is null || x.TopicId == topicId))
             .ToArray();
         var versions = await _uow.QuestionVersions.ListAsync(ct);
-        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, null, ct);
+        var answers = (await _uow.DiagnosticAnswers.ListAsync(ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var topics = await _uow.Topics.ListAsync(ct);
         var topicById = topics.ToDictionary(x => x.Id);
         var result = new List<PsychometricItemDto>(questions.Length);
@@ -261,7 +264,10 @@ public sealed class AdvancedAnalyticsService : IAdvancedAnalyticsService
     public async Task<IReadOnlyList<ContentDriftDto>> ContentDriftAsync(CancellationToken ct = default)
     {
         var questions = await _uow.Questions.ListAsync(ct);
-        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, null, ct);
+        var answers = (await _uow.DiagnosticAnswers.ListAsync(ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var cutoff = _clock.UtcNow.AddDays(-30);
         var previousCutoff = cutoff.AddDays(-60);
         var result = new List<ContentDriftDto>();
@@ -298,7 +304,10 @@ public sealed class AdvancedAnalyticsService : IAdvancedAnalyticsService
         var users = await _uow.Users.ListAsync(ct);
         var students = users.Where(x => x.Role == UserRole.Student && x.IsActive).ToArray();
         var questions = await _uow.Questions.ListAsync(ct);
-        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, null, ct);
+        var answers = (await _uow.DiagnosticAnswers.ListAsync(ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var states = await _uow.UserMisconceptions.ListAsync(ct);
         var masteries = await _uow.TopicMasteries.ListAsync(ct);
         var sessions = await _uow.DiagnosticSessions.ListAsync(ct);
@@ -309,7 +318,7 @@ public sealed class AdvancedAnalyticsService : IAdvancedAnalyticsService
         return new AdvancedSystemOverviewDto(
             students.Length,
             questions.Count(x => x.Status == ContentStatus.Published),
-            answers.Count,
+            answers.Length,
             states.Count(x => IsActive(x.Status)),
             risks.Count(x => x.Risk >= .55d),
             drift.Count(x => x.RequiresReview),

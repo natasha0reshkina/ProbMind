@@ -104,14 +104,17 @@ public sealed class StatisticsService : IStatisticsService
 
     public async Task<CohortAnalyticsDto> CohortAsync(CancellationToken ct = default)
     {
-        const string key = "analytics:cohort:v3";
+        const string key = "analytics:cohort:v4";
         var cached = await _cache.GetAsync<CohortAnalyticsDto>(key, ct);
         if (cached is not null)
             return cached;
 
         var users = await _uow.Users.WhereAsync(x => x.Role == UserRole.Student && x.IsActive && !x.Email.EndsWith("@probmind.test"), ct);
         var diagnostics = await _uow.DiagnosticSessions.ListAsync(ct);
-        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, null, ct);
+        var answers = (await _uow.DiagnosticAnswers.ListAsync(ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var topicStates = await _uow.TopicMasteries.ListAsync(ct);
         var topics = await _uow.Topics.ListAsync(ct);
 
@@ -139,7 +142,7 @@ public sealed class StatisticsService : IStatisticsService
         var result = new CohortAnalyticsDto(
             users.Count,
             completed.Length,
-            answers.Count,
+            answers.Length,
             completed.Length == 0 ? 0d : completed.Average(x => x.OverallScore!.Value),
             prevalence,
             meanTopic);
@@ -154,7 +157,10 @@ public sealed class StatisticsService : IStatisticsService
         var students = await _uow.Users.WhereAsync(
             x => x.Role == UserRole.Student && x.IsActive && !x.Email.EndsWith("@probmind.test"),
             ct);
-        var answers = await _uow.DiagnosticAnswers.ListAsync(ct);
+        var hiddenExamSessions = await ExamSessionRules.ActiveSessionIdsAsync(_uow, null, ct);
+        var answers = (await _uow.DiagnosticAnswers.ListAsync(ct))
+            .Where(x => !hiddenExamSessions.Contains(x.SessionId))
+            .ToArray();
         var studentsWithResults = students.Count(user => answers.Any(answer => answer.UserId == user.Id));
         return await BuildPrevalenceAsync(studentsWithResults, ct);
     }

@@ -9,7 +9,8 @@ public sealed record AdminUserDto(
     UserRole Role,
     bool IsActive,
     DateTimeOffset? LastLoginAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<string> GroupNames);
 
 public sealed record SetUserRoleRequest(Guid UserId, UserRole Role);
 public sealed record SetUserActiveRequest(Guid UserId, bool IsActive);

@@ -15,6 +15,7 @@ public sealed class DiagnosticTemplateQuestionConfiguration : IEntityTypeConfigu
         builder.Property(x => x.UpdatedAt).IsRequired();
         builder.HasIndex(x => x.DiagnosticTemplateId);
         builder.HasIndex(x => x.QuestionId);
+        builder.HasIndex(x => x.QuestionVersionId);
         builder.HasIndex(x => new { x.DiagnosticTemplateId, x.Position }).IsUnique();
         builder.HasIndex(x => new { x.DiagnosticTemplateId, x.QuestionId }).IsUnique();
     }
