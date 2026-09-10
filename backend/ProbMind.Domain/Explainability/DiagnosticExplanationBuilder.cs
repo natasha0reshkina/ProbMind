@@ -47,7 +47,7 @@ public sealed class DiagnosticExplanationBuilder
 
         var summary = confidence switch
         {
-            >= 0.70d => $"Ошибка {misconceptionTitle} повторяется в ответах. Уровень подтверждения: {confidence:P0}.",
+            >= 0.70d => $"Ошибка {misconceptionTitle} устойчиво повторяется в ответах. Уровень подтверждения: {confidence:P0}.",
             >= 0.40d => $"Есть признаки ошибки {misconceptionTitle}, но нужны дополнительные ответы. Уровень подтверждения: {confidence:P0}.",
             _ => $"Данных по ошибке {misconceptionTitle} пока недостаточно. Уровень подтверждения: {confidence:P0}."
         };
@@ -56,7 +56,7 @@ public sealed class DiagnosticExplanationBuilder
             ? "Завершить текущую практику и решить дополнительную задачу без подсказок."
             : confidence >= 0.50d
                 ? "Повторить объяснение по теме и выполнить несколько практических заданий."
-                : "Пройти ещё несколько диагностических заданий по этой теме, чтобы уточнить результат.";
+                : "Пройти дополнительные диагностические задания по этой теме, чтобы уточнить результат.";
 
         return new DiagnosticExplanation(
             summary,
